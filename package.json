@@ -27,7 +27,8 @@
     "format:write": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test test/**/*.test.ts",
-    "test:live": "LIVE_FEED_TESTS=1 node --import tsx --test test/integration/*.test.ts"
+    "test:live": "LIVE_FEED_TESTS=1 node --import tsx --test test/integration/*.test.ts",
+    "publish": "npm publish --access public --ignore-scripts"
   },
   "dependencies": {
     "ws": "^8.18.3"
@@ -46,6 +47,6 @@
     "template": "node-lib",
     "profilePath": null,
     "withAiAdapters": true,
-    "lastRefreshWith": "0.1.7"
+    "lastRefreshWith": "0.1.8"
   }
 }

@@ -102,11 +102,7 @@ export class PaymentNormalizer {
     }
 
     clone.amount = Number(clone.amount || 0);
-    const persisted: PersistedPaymentInput = {
-      ...clone,
-      normalizedAt: Date.now(),
-      saved: true
-    };
+    const persisted: PersistedPaymentInput = { ...clone, normalizedAt: Date.now(), saved: true };
     return persisted;
   }
 

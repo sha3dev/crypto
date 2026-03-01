@@ -1,15 +1,16 @@
 # @sha3/crypto
 
-Node.js TypeScript library that normalizes crypto `price`, `orderbook`, and `trade` feeds across Binance, Coinbase, Kraken, OKX, and Chainlink.
+Node.js TypeScript library that normalizes real-time crypto feeds across Binance, Coinbase, Kraken, OKX, and Chainlink.
 
-It provides one integration contract for backend services and LLM agents:
+It exposes a single backend-oriented API for:
 
-- unified event model,
-- resilient multi-provider connection,
+- live unified events (`price`, `orderbook`, `trade`, `status`),
+- resilient multi-provider connections,
 - latest snapshots,
-- historical range/closest-time queries.
+- historical range queries,
+- nearest-price lookup by timestamp.
 
-## Quick Start (under 60s)
+## TL;DR
 
 ```bash
 npm i @sha3/crypto
@@ -20,7 +21,7 @@ import { CryptoFeedClient } from "@sha3/crypto";
 
 const client = CryptoFeedClient.create({ symbols: ["btc"], providers: ["binance", "chainlink"] });
 
-const sub = client.subscribe((event) => {
+const subscription = client.subscribe((event) => {
   if (event.type === "price") {
     console.log(event.provider, event.symbol, event.price);
   }
@@ -29,24 +30,16 @@ const sub = client.subscribe((event) => {
 await client.connect();
 
 const now = Date.now();
-const history = client.getPriceHistory({ symbol: "btc", fromTs: now - 60_000, toTs: now });
-console.log("points", history.length);
+const prices = client.getPriceHistory({ symbol: "btc", fromTs: now - 60_000, toTs: now });
+console.log(prices.length);
 
-sub.unsubscribe();
+subscription.unsubscribe();
 await client.disconnect();
 ```
 
-## Why This Library Exists
+## Why This Exists
 
-Each exchange uses different websocket payloads, symbols, and book/trade formats.
-This library isolates those differences and exposes a deterministic API so application code stays provider-agnostic.
-
-## Compatibility
-
-- Runtime: Node.js `>=20`
-- Module system: ESM (`"type": "module"`)
-- TypeScript: strict mode expected in consuming projects
-- Transport: websocket egress required to provider endpoints
+Provider payloads, symbols, and message semantics differ by exchange. This library isolates that complexity and provides one deterministic integration contract for application services and LLM-driven tooling.
 
 ## Installation
 
@@ -54,13 +47,20 @@ This library isolates those differences and exposes a deterministic API so appli
 npm i @sha3/crypto
 ```
 
+## Compatibility
+
+- Node.js `>=20`
+- ESM runtime (`"type": "module"`)
+- TypeScript consumer support expected (package publishes `.d.ts`)
+- Outbound websocket network access required
+
 ## Integration Guide (External Projects)
 
 1. Install `@sha3/crypto`.
-2. Import only from the package entrypoint.
+2. Import from package root only.
 3. Create one `CryptoFeedClient` per service boundary.
-4. Subscribe to feed events and persist/route as needed.
-5. Use query methods for latest/historical access.
+4. Subscribe to feed events and route/persist as needed.
+5. Query latest/historical data through client methods.
 
 ```ts
 import { CryptoFeedClient } from "@sha3/crypto";
@@ -73,7 +73,7 @@ const client = CryptoFeedClient.create({
 await client.connect();
 ```
 
-Do not import internal paths such as `src/*` from consumers.
+Do not import internal modules like `src/*` from consuming projects.
 
 ## Public API Reference
 
@@ -114,80 +114,85 @@ Do not import internal paths such as `src/*` from consumers.
 
 ### Behavior Expectations
 
-- `connect()` attempts all providers in parallel.
-- `connect()` succeeds when at least one provider connects.
-- If all providers fail, `connect()` throws `NoProvidersConnectedError`.
-- Historical range queries are inclusive (`fromTs <= ts <= toTs`).
-- Aggregated queries (without `provider`) are sorted by timestamp asc, then provider name.
+- `connect()` attempts all selected providers in parallel.
+- `connect()` resolves if at least one provider connects.
+- If all fail, `connect()` throws `NoProvidersConnectedError`.
+- Range queries are inclusive (`fromTs <= ts <= toTs`).
+- Aggregated history (without `provider`) is sorted by timestamp asc, then provider id.
 
 ## Configuration Reference (`src/config.ts`)
 
-Configuration is centralized in [`src/config.ts`](src/config.ts) and exported as default `CONFIG`.
+Runtime defaults are centralized in [`src/config.ts`](src/config.ts) as a single default object (`CONFIG`).
 
-- `CONFIG.clientDefaults.symbols`:
-  default symbols used when `ClientOptions.symbols` is omitted.
-- `CONFIG.clientDefaults.providers`:
-  default providers used when `ClientOptions.providers` is omitted.
-- `CONFIG.clientDefaults.retention.windowMs`:
-  in-memory retention window in milliseconds.
-- `CONFIG.clientDefaults.retention.maxSamplesPerStream`:
-  max retained `price/orderbook` points per stream.
-- `CONFIG.clientDefaults.retention.maxTradesPerStream`:
-  max retained `trade` points per stream.
-- `CONFIG.clientDefaults.orderBookLevels`:
-  per-provider book depth used in provider adapters.
-- `CONFIG.providerConnection.*`:
-  reconnect backoff and connect timeout defaults.
-- `CONFIG.providerUrls.*`:
-  websocket endpoints by provider.
-- `CONFIG.chainlink.topic`:
-  topic used for Chainlink subscription payload.
+- `CONFIG.clientDefaults.symbols`
+  - default symbol list when `ClientOptions.symbols` is omitted.
+- `CONFIG.clientDefaults.providers`
+  - default provider list when `ClientOptions.providers` is omitted.
+- `CONFIG.clientDefaults.retention.windowMs`
+  - in-memory retention window (ms).
+- `CONFIG.clientDefaults.retention.maxSamplesPerStream`
+  - max retained `price/orderbook` points per stream.
+- `CONFIG.clientDefaults.retention.maxTradesPerStream`
+  - max retained `trade` points per stream.
+- `CONFIG.clientDefaults.orderBookLevels`
+  - depth used by provider adapters.
+- `CONFIG.providerConnection.reconnectBaseDelayMs`
+  - initial reconnect delay.
+- `CONFIG.providerConnection.reconnectMaxDelayMs`
+  - max reconnect delay cap.
+- `CONFIG.providerConnection.reconnectJitterRatio`
+  - jitter factor for reconnect backoff.
+- `CONFIG.providerConnection.connectTimeoutMs`
+  - connect timeout per provider.
+- `CONFIG.providerUrls.*`
+  - websocket endpoints by provider.
+- `CONFIG.chainlink.topic`
+  - Chainlink subscription topic.
 
-## Live Integration Tests
+## Testing
 
-Run deterministic unit/integration suite:
+Run deterministic checks:
 
 ```bash
 npm run check
 ```
 
-Run live provider connectivity tests (real websocket data):
+Run live integration tests against real providers:
 
 ```bash
 npm run test:live
 ```
 
-Live tests are network-dependent and may be skipped when a provider is temporarily rate-limited.
+Live tests can skip provider-specific checks when endpoints are temporarily rate-limited or unavailable.
 
 ## Troubleshooting
 
 ### No providers connected
 
-- Verify outbound websocket connectivity from your runtime.
-- Review emitted `status` events for provider-specific error messages.
+- Verify websocket egress from your environment.
+- Inspect `status` events to identify the failing provider.
 
-### Sparse historical data
+### Missing historical points
 
-- Increase retention in `ClientOptions.retention`.
-- Ensure process uptime is long enough to accumulate points.
+- Increase `ClientOptions.retention`.
+- Ensure process uptime is long enough to accumulate data.
 
-### ESM import problems
+### ESM import errors
 
-- Ensure consumer project supports ESM imports.
-- Use Node.js 20+.
+- Ensure consumer project supports ESM imports on Node.js 20+.
 
 ## AI Usage
 
-If you use assistants in this repository:
+When using assistants in this repo:
 
 1. Treat `AGENTS.md` as blocking contract.
-2. Follow class-first + constructor injection rules.
-3. Keep single-return policy and braces policy.
-4. Keep `src/config.ts` as single default config object (`import CONFIG from ".../config.js"`).
-5. Add/update tests on behavior changes.
+2. Keep class-first architecture and constructor injection.
+3. Keep single-return policy and control-flow braces.
+4. Keep `src/config.ts` as a single default object and import it as `import CONFIG from ".../config.js"`.
+5. Update tests for behavior changes.
 6. Run `npm run check` before finalizing.
 
-## Development Commands
+## Development
 
 ```bash
 npm install

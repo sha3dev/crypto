@@ -121,10 +121,7 @@ export class InvoiceService {
     const totalAmount = invoices.reduce((sum, invoice) => {
       return sum + invoice.amount;
     }, 0);
-    const summary: InvoiceSummary = {
-      count: invoices.length,
-      totalAmount
-    };
+    const summary: InvoiceSummary = { count: invoices.length, totalAmount };
     return summary;
   }
 

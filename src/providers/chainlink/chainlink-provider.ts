@@ -37,7 +37,7 @@ export class ChainlinkProvider extends BaseProvider {
    * @section private:attributes
    */
 
-  private readonly symbols: string[];
+  private readonly symbols: Set<string>;
 
   /**
    * @section protected:attributes
@@ -68,7 +68,7 @@ export class ChainlinkProvider extends BaseProvider {
       wsFactory: options.wsFactory,
       providerOptions: options.providerOptions
     });
-    this.symbols = options.symbols;
+    this.symbols = this.normalizeConfiguredSymbols(options.symbols);
   }
 
   /**
@@ -90,18 +90,32 @@ export class ChainlinkProvider extends BaseProvider {
    * @section private:methods
    */
 
-  private toSymbol(rawSymbol: string): string {
-    const symbol = rawSymbol.split("/")[0]?.toLowerCase() ?? "";
+  private toBaseSymbol(symbolInput: string): string {
+    const normalizedInput = symbolInput.trim().toLowerCase();
+    const symbol = normalizedInput.split(/[/:_-]/)[0] ?? "";
     return symbol;
   }
 
-  private shouldIncludeSymbol(symbol: string): boolean {
+  private normalizeConfiguredSymbols(symbols: string[]): Set<string> {
+    const normalizedSymbols = new Set<string>();
+
+    for (const symbolInput of symbols) {
+      const symbol = this.toBaseSymbol(symbolInput);
+
+      if (symbol.length > 0) {
+        normalizedSymbols.add(symbol);
+      }
+    }
+
+    return normalizedSymbols;
+  }
+
+  private shouldIncludeSymbol(symbolInput: string): boolean {
+    const symbol = this.toBaseSymbol(symbolInput);
     let include = false;
 
-    for (const allowedSymbol of this.symbols) {
-      if (allowedSymbol === symbol) {
-        include = true;
-      }
+    if (this.symbols.has(symbol)) {
+      include = true;
     }
 
     return include;
@@ -114,7 +128,7 @@ export class ChainlinkProvider extends BaseProvider {
 
     if (topic === CHAINLINK_TOPIC && eventType === "update") {
       const rawSymbol = envelope.payload?.symbol ?? "";
-      const symbol = this.toSymbol(rawSymbol);
+      const symbol = this.toBaseSymbol(rawSymbol);
       const ts = Number(envelope.payload?.timestamp ?? envelope.timestamp);
       const price = Number(envelope.payload?.value);
       const isValid =

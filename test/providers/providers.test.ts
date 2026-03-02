@@ -170,3 +170,28 @@ test("chainlink parser emits price update", async () => {
   });
   assert.equal(hasPrice, true);
 });
+
+test("chainlink parser normalizes configured symbol formats", async () => {
+  const events: FeedEvent[] = [];
+  const provider = ChainlinkProvider.create({
+    symbols: ["BTC/USD"],
+    timeUtils: TimeUtils.createSystemTime(),
+    wsFactory: createNoopFactory(),
+    providerOptions: createOptions()
+  });
+
+  await armListener(provider, collectEvents(events));
+  provider.handleRawMessage(
+    JSON.stringify({
+      topic: "crypto_prices_chainlink",
+      type: "update",
+      payload: { symbol: "btc/usd", timestamp: 1000, value: 10 }
+    })
+  );
+
+  const hasPrice = events.some((event) => {
+    const keep = event.type === "price";
+    return keep;
+  });
+  assert.equal(hasPrice, true);
+});

@@ -55,6 +55,10 @@ type RunProviderCoverageOptions = {
   providerName: string;
   skipRateLimited: boolean;
 };
+type ErrorDetails = {
+  message: string;
+  normalizedMessage: string;
+};
 
 const createProviderOptions = (): ProviderBaseOptions => {
   const options: ProviderBaseOptions = {
@@ -191,13 +195,38 @@ const createCoverageWaiter = (options: CoverageWaiterOptions): CoverageWaiter =>
   return waiter;
 };
 
-const isRateLimitedError = (error: unknown): boolean => {
-  let limited = false;
+const toErrorDetails = (error: unknown): ErrorDetails => {
+  let message = "unknown error";
 
   if (error instanceof Error) {
-    const message = error.message.toLowerCase();
-    limited =
-      message.includes("429") || message.includes("rate") || message.includes("too many requests");
+    message = error.message;
+  } else if (typeof error === "string") {
+    message = error;
+  }
+
+  const normalizedMessage = message.toLowerCase();
+  const details: ErrorDetails = { message, normalizedMessage };
+  return details;
+};
+
+const toSkipMessage = (prefix: string, error: unknown): string => {
+  const details = toErrorDetails(error);
+  const collapsed = details.message.replace(/\s+/g, " ").trim();
+  const message = `${prefix}: ${collapsed}`;
+  return message;
+};
+
+const isRateLimitedError = (error: unknown): boolean => {
+  const details = toErrorDetails(error);
+  const has429 = details.normalizedMessage.includes("429");
+  const hasRateLimitPhrase =
+    details.normalizedMessage.includes("too many requests") ||
+    details.normalizedMessage.includes("rate limit") ||
+    details.normalizedMessage.includes("rate-limited");
+  let limited = false;
+
+  if (has429 || hasRateLimitPhrase) {
+    limited = true;
   }
 
   return limited;
@@ -240,7 +269,9 @@ const runProviderCoverage = async (options: RunProviderCoverageOptions): Promise
     await options.provider.disconnect();
 
     if (options.skipRateLimited && isRateLimitedError(error)) {
-      options.context.skip(`${options.providerName} endpoint rate-limited this environment`);
+      options.context.skip(
+        toSkipMessage(`${options.providerName} endpoint rate-limited this environment`, error)
+      );
       skipRateLimited = true;
     } else {
       connectError = error;
@@ -461,7 +492,9 @@ test(
     } catch (error) {
       await client.disconnect();
       if (isOnlyChainlinkUnavailable(error) || isRateLimitedError(error)) {
-        context.skip("Chainlink client source unavailable in this environment");
+        context.skip(
+          toSkipMessage("Chainlink client source unavailable in this environment", error)
+        );
         skipUnavailable = true;
       } else {
         connectError = error;

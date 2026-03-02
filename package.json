@@ -26,7 +26,7 @@
     "format:check": "prettier --check .",
     "format:write": "prettier --write .",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test test/**/*.test.ts",
+    "test": "node scripts/run-tests.mjs",
     "test:live": "LIVE_FEED_TESTS=1 node --import tsx --test test/integration/*.test.ts",
     "publish": "node scripts/release-publish.mjs"
   },
@@ -47,7 +47,7 @@
     "template": "node-lib",
     "profilePath": null,
     "withAiAdapters": true,
-    "lastRefreshWith": "0.1.17"
+    "lastRefreshWith": "0.1.18"
   },
   "repository": {
     "type": "git",

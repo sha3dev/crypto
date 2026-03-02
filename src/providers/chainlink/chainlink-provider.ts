@@ -9,7 +9,7 @@
  */
 
 import type { TimeUtils } from "../../shared/time-utils.js";
-import CONFIG from "../../config.js";
+import CONFIG from "../../config.ts";
 import { BaseProvider, type WebSocketFactory } from "../shared/base-provider.js";
 import type { ProviderBaseOptions, ProviderDataEvent } from "../shared/provider-types.js";
 import type { ChainlinkEnvelope } from "./chainlink-types.js";
@@ -131,8 +131,6 @@ export class ChainlinkProvider extends BaseProvider {
   /**
    * @section protected:methods
    */
-
-  // empty
 
   protected getConnectionUrl(): string {
     const url = CHAINLINK_WS_URL;

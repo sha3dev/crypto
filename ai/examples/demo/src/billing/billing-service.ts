@@ -8,9 +8,9 @@
  * @section imports:internals
  */
 
-import CONFIG from "../config.js";
-import type { InvoiceService } from "../invoices/invoice-service.js";
-import type { InvoiceSummary } from "../invoices/invoice-types.js";
+import CONFIG from "../config.ts";
+import type { InvoiceService } from "../invoices/invoice-service.ts";
+import type { InvoiceSummary } from "../invoices/invoice-types.ts";
 
 /**
  * @section consts

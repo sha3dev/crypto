@@ -10,7 +10,7 @@
 
 import type { OrderBookMerger } from "../../shared/order-book-merger.js";
 import type { TimeUtils } from "../../shared/time-utils.js";
-import CONFIG from "../../config.js";
+import CONFIG from "../../config.ts";
 import { BaseProvider, type WebSocketFactory } from "../shared/base-provider.js";
 import type { ProviderBaseOptions, ProviderDataEvent } from "../shared/provider-types.js";
 import type { KrakenEnvelope, KrakenLocalBook } from "./kraken-types.js";
@@ -32,6 +32,13 @@ type KrakenProviderOptions = {
   wsFactory: WebSocketFactory;
   providerOptions: ProviderBaseOptions;
   bookMerger: OrderBookMerger;
+};
+type DepthLevel = { price: number; size: number };
+type AppendKrakenEventsOptions = {
+  events: ProviderDataEvent[];
+  channel: string;
+  rows: Array<Record<string, unknown>>;
+  kind: string;
 };
 
 export class KrakenProvider extends BaseProvider {
@@ -107,8 +114,8 @@ export class KrakenProvider extends BaseProvider {
     return symbol;
   }
 
-  private parseBookLevels(rawLevels: unknown[]): { price: number; size: number }[] {
-    const levels: { price: number; size: number }[] = [];
+  private parseBookLevels(rawLevels: unknown[]): DepthLevel[] {
+    const levels: DepthLevel[] = [];
 
     for (const rawLevel of rawLevels) {
       const level = rawLevel as { price?: number; qty?: number };
@@ -166,11 +173,55 @@ export class KrakenProvider extends BaseProvider {
     return book;
   }
 
+  private appendTickerEvents(options: AppendKrakenEventsOptions): void {
+    if (options.channel === "ticker") {
+      for (const row of options.rows) {
+        const symbol = this.toSymbol(String(row.symbol ?? ""));
+        const ts = Number(new Date(String(row.timestamp ?? "")).getTime());
+        const price = Number(row.last);
+        const isValid = symbol.length > 0 && Number.isFinite(ts) && Number.isFinite(price);
+
+        if (isValid) {
+          options.events.push({ type: "price", provider: this.id, symbol, ts, price });
+        }
+      }
+    }
+  }
+
+  private appendBookEvents(options: AppendKrakenEventsOptions): void {
+    if (options.channel === "book") {
+      for (const row of options.rows) {
+        const symbol = this.toSymbol(String(row.symbol ?? ""));
+        const ts = Number(new Date(String(row.timestamp ?? "")).getTime());
+        const rawAsks = Array.isArray(row.asks) ? row.asks : [];
+        const rawBids = Array.isArray(row.bids) ? row.bids : [];
+        let book: KrakenLocalBook | null = null;
+
+        if (options.kind === "snapshot") {
+          book = this.saveSnapshot(symbol, rawAsks, rawBids);
+        } else {
+          book = this.applyUpdate(symbol, rawAsks, rawBids);
+        }
+
+        const isValid = symbol.length > 0 && Number.isFinite(ts) && Boolean(book);
+
+        if (isValid && book) {
+          options.events.push({
+            type: "orderbook",
+            provider: this.id,
+            symbol,
+            ts,
+            asks: book.asks,
+            bids: book.bids
+          });
+        }
+      }
+    }
+  }
+
   /**
    * @section protected:methods
    */
-
-  // empty
 
   protected getConnectionUrl(): string {
     const url = KRAKEN_WS_URL;
@@ -200,50 +251,11 @@ export class KrakenProvider extends BaseProvider {
     const events: ProviderDataEvent[] = [];
     const envelope = JSON.parse(message) as KrakenEnvelope;
     const channel = envelope.channel ?? "";
-    const rows = envelope.data ?? [];
+    const rows = (envelope.data ?? []) as Array<Record<string, unknown>>;
     const kind = envelope.type ?? "";
-
-    if (channel === "ticker") {
-      for (const row of rows) {
-        const symbol = this.toSymbol(String(row.symbol ?? ""));
-        const ts = Number(new Date(String(row.timestamp ?? "")).getTime());
-        const price = Number(row.last);
-        const isValid = symbol.length > 0 && Number.isFinite(ts) && Number.isFinite(price);
-
-        if (isValid) {
-          events.push({ type: "price", provider: this.id, symbol, ts, price });
-        }
-      }
-    }
-
-    if (channel === "book") {
-      for (const row of rows) {
-        const symbol = this.toSymbol(String(row.symbol ?? ""));
-        const ts = Number(new Date(String(row.timestamp ?? "")).getTime());
-        const rawAsks = Array.isArray(row.asks) ? row.asks : [];
-        const rawBids = Array.isArray(row.bids) ? row.bids : [];
-        let book: KrakenLocalBook | null = null;
-
-        if (kind === "snapshot") {
-          book = this.saveSnapshot(symbol, rawAsks, rawBids);
-        } else {
-          book = this.applyUpdate(symbol, rawAsks, rawBids);
-        }
-
-        const isValid = symbol.length > 0 && Number.isFinite(ts) && Boolean(book);
-
-        if (isValid && book) {
-          events.push({
-            type: "orderbook",
-            provider: this.id,
-            symbol,
-            ts,
-            asks: book.asks,
-            bids: book.bids
-          });
-        }
-      }
-    }
+    const options: AppendKrakenEventsOptions = { events, channel, rows, kind };
+    this.appendTickerEvents(options);
+    this.appendBookEvents(options);
 
     return events;
   }

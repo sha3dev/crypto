@@ -10,7 +10,7 @@
 
 import type { OrderBookMerger } from "../../shared/order-book-merger.js";
 import type { TimeUtils } from "../../shared/time-utils.js";
-import CONFIG from "../../config.js";
+import CONFIG from "../../config.ts";
 import { BaseProvider, type WebSocketFactory } from "../shared/base-provider.js";
 import type { ProviderBaseOptions, ProviderDataEvent } from "../shared/provider-types.js";
 import type { CoinbaseEnvelope, CoinbaseLocalBook } from "./coinbase-types.js";
@@ -32,6 +32,13 @@ type CoinbaseProviderOptions = {
   wsFactory: WebSocketFactory;
   providerOptions: ProviderBaseOptions;
   bookMerger: OrderBookMerger;
+};
+type DepthLevel = { price: number; size: number };
+type AppendCoinbaseEventsOptions = {
+  events: ProviderDataEvent[];
+  envelope: CoinbaseEnvelope;
+  eventType: string;
+  symbol: string;
 };
 
 export class CoinbaseProvider extends BaseProvider {
@@ -107,8 +114,8 @@ export class CoinbaseProvider extends BaseProvider {
     return symbol;
   }
 
-  private parseLevels(rawLevels: [string, string][]): { price: number; size: number }[] {
-    const levels: { price: number; size: number }[] = [];
+  private parseLevels(rawLevels: [string, string][]): DepthLevel[] {
+    const levels: DepthLevel[] = [];
 
     for (const [rawPrice, rawSize] of rawLevels) {
       const price = Number(rawPrice);
@@ -120,6 +127,24 @@ export class CoinbaseProvider extends BaseProvider {
     }
 
     return levels;
+  }
+
+  private appendTickerEvents(options: AppendCoinbaseEventsOptions): void {
+    if (options.eventType === "ticker") {
+      const ts = Number(new Date(options.envelope.time ?? "").getTime());
+      const price = Number(options.envelope.price);
+      const isValid = options.symbol.length > 0 && Number.isFinite(ts) && Number.isFinite(price);
+
+      if (isValid) {
+        options.events.push({
+          type: "price",
+          provider: this.id,
+          symbol: options.symbol,
+          ts,
+          price
+        });
+      }
+    }
   }
 
   private updateFromSnapshot(
@@ -182,11 +207,50 @@ export class CoinbaseProvider extends BaseProvider {
     return updatedBook;
   }
 
+  private appendSnapshotEvents(options: AppendCoinbaseEventsOptions): void {
+    if (options.eventType === "snapshot") {
+      const asks = options.envelope.asks ?? [];
+      const bids = options.envelope.bids ?? [];
+      const ts = Date.now();
+      const book = this.updateFromSnapshot(options.symbol, asks, bids);
+      const isValid = options.symbol.length > 0;
+
+      if (isValid) {
+        options.events.push({
+          type: "orderbook",
+          provider: this.id,
+          symbol: options.symbol,
+          ts,
+          asks: book.asks,
+          bids: book.bids
+        });
+      }
+    }
+  }
+
+  private appendUpdateEvents(options: AppendCoinbaseEventsOptions): void {
+    if (options.eventType === "l2update") {
+      const changes = options.envelope.changes ?? [];
+      const ts = Number(new Date(options.envelope.time ?? "").getTime());
+      const book = this.updateFromDelta(options.symbol, changes);
+      const isValid = options.symbol.length > 0 && Number.isFinite(ts) && Boolean(book);
+
+      if (isValid && book) {
+        options.events.push({
+          type: "orderbook",
+          provider: this.id,
+          symbol: options.symbol,
+          ts,
+          asks: book.asks,
+          bids: book.bids
+        });
+      }
+    }
+  }
+
   /**
    * @section protected:methods
    */
-
-  // empty
 
   protected getConnectionUrl(): string {
     const url = COINBASE_WS_URL;
@@ -215,53 +279,10 @@ export class CoinbaseProvider extends BaseProvider {
     const eventType = envelope.type ?? "";
     const productId = envelope.product_id ?? "";
     const symbol = this.toSymbol(productId);
-
-    if (eventType === "ticker") {
-      const ts = Number(new Date(envelope.time ?? "").getTime());
-      const price = Number(envelope.price);
-      const isValid = symbol.length > 0 && Number.isFinite(ts) && Number.isFinite(price);
-
-      if (isValid) {
-        events.push({ type: "price", provider: this.id, symbol, ts, price });
-      }
-    }
-
-    if (eventType === "snapshot") {
-      const asks = envelope.asks ?? [];
-      const bids = envelope.bids ?? [];
-      const ts = Date.now();
-      const book = this.updateFromSnapshot(symbol, asks, bids);
-      const isValid = symbol.length > 0;
-
-      if (isValid) {
-        events.push({
-          type: "orderbook",
-          provider: this.id,
-          symbol,
-          ts,
-          asks: book.asks,
-          bids: book.bids
-        });
-      }
-    }
-
-    if (eventType === "l2update") {
-      const changes = envelope.changes ?? [];
-      const ts = Number(new Date(envelope.time ?? "").getTime());
-      const book = this.updateFromDelta(symbol, changes);
-      const isValid = symbol.length > 0 && Number.isFinite(ts) && Boolean(book);
-
-      if (isValid && book) {
-        events.push({
-          type: "orderbook",
-          provider: this.id,
-          symbol,
-          ts,
-          asks: book.asks,
-          bids: book.bids
-        });
-      }
-    }
+    const options: AppendCoinbaseEventsOptions = { events, envelope, eventType, symbol };
+    this.appendTickerEvents(options);
+    this.appendSnapshotEvents(options);
+    this.appendUpdateEvents(options);
 
     return events;
   }

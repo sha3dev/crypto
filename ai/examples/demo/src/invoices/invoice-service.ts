@@ -8,9 +8,9 @@ import { randomUUID } from "node:crypto";
  * @section imports:internals
  */
 
-import CONFIG from "../config.js";
-import { InvalidInvoiceCommandError } from "./invoice-errors.js";
-import type { CreateInvoiceCommand, Invoice, InvoiceSummary } from "./invoice-types.js";
+import CONFIG from "../config.ts";
+import { InvalidInvoiceCommandError } from "./invoice-errors.ts";
+import type { CreateInvoiceCommand, Invoice, InvoiceSummary } from "./invoice-types.ts";
 
 /**
  * @section consts

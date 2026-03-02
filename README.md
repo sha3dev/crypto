@@ -188,7 +188,7 @@ When using assistants in this repo:
 1. Treat `AGENTS.md` as blocking contract.
 2. Keep class-first architecture and constructor injection.
 3. Keep single-return policy and control-flow braces.
-4. Keep `src/config.ts` as a single default object and import it as `import CONFIG from ".../config.js"`.
+4. Keep `src/config.ts` as a single default object and import it as `import CONFIG from ".../config.ts"`.
 5. Update tests for behavior changes.
 6. Run `npm run check` before finalizing.
 

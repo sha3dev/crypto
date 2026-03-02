@@ -230,6 +230,8 @@ const runProviderCoverage = async (options: RunProviderCoverageOptions): Promise
     requirements: options.requirements
   });
   let matchedEvents: Map<string, FeedEvent> | null = null;
+  let skipRateLimited = false;
+  let connectError: unknown = null;
 
   try {
     await options.provider.connect(waiter.listener);
@@ -239,25 +241,33 @@ const runProviderCoverage = async (options: RunProviderCoverageOptions): Promise
 
     if (options.skipRateLimited && isRateLimitedError(error)) {
       options.context.skip(`${options.providerName} endpoint rate-limited this environment`);
-      return;
+      skipRateLimited = true;
+    } else {
+      connectError = error;
     }
-
-    throw error;
   }
 
-  try {
-    matchedEvents = await waiter.promise;
-  } finally {
-    waiter.dispose();
-    await options.provider.disconnect();
+  if (connectError) {
+    throw connectError;
   }
 
-  assert.equal(matchedEvents !== null, true);
+  if (!skipRateLimited) {
+    try {
+      matchedEvents = await waiter.promise;
+    } finally {
+      waiter.dispose();
+      await options.provider.disconnect();
+    }
+  }
 
-  if (matchedEvents) {
-    for (const requirement of options.requirements) {
-      const key = toRequirementKey(requirement);
-      assert.equal(matchedEvents.has(key), true);
+  if (!skipRateLimited) {
+    assert.equal(matchedEvents !== null, true);
+
+    if (matchedEvents) {
+      for (const requirement of options.requirements) {
+        const key = toRequirementKey(requirement);
+        assert.equal(matchedEvents.has(key), true);
+      }
     }
   }
 };
@@ -443,6 +453,8 @@ test(
     let subscription: { unsubscribe(): void } | null = null;
     let matchedEvents: Map<string, FeedEvent> | null = null;
     let waiterError: unknown = null;
+    let connectError: unknown = null;
+    let skipUnavailable = false;
 
     try {
       await client.connect();
@@ -450,47 +462,55 @@ test(
       await client.disconnect();
       if (isOnlyChainlinkUnavailable(error) || isRateLimitedError(error)) {
         context.skip("Chainlink client source unavailable in this environment");
-        return;
+        skipUnavailable = true;
+      } else {
+        connectError = error;
       }
-
-      throw error;
     }
 
-    waiter = createCoverageWaiter({
-      timeoutMs: LIVE_PROVIDER_TIMEOUT_MS,
-      requirements: [{ provider: "chainlink", symbol: "btc", type: "price" }]
-    });
-    subscription = client.subscribe(waiter.listener);
-
-    try {
-      matchedEvents = await waiter.promise;
-    } catch (error) {
-      waiterError = error;
-    } finally {
-      waiter.dispose();
-      if (subscription) {
-        subscription.unsubscribe();
-      }
-
-      await client.disconnect();
+    if (connectError) {
+      throw connectError;
     }
 
-    if (waiterError) {
-      if (isTimeoutError(waiterError)) {
-        context.skip(
-          "Chainlink client stream did not emit BTC price within timeout in this environment"
-        );
-      }
+    if (!skipUnavailable) {
+      waiter = createCoverageWaiter({
+        timeoutMs: LIVE_PROVIDER_TIMEOUT_MS,
+        requirements: [{ provider: "chainlink", symbol: "btc", type: "price" }]
+      });
+      subscription = client.subscribe(waiter.listener);
 
-      throw waiterError;
+      try {
+        matchedEvents = await waiter.promise;
+      } catch (error) {
+        waiterError = error;
+      } finally {
+        waiter.dispose();
+        if (subscription) {
+          subscription.unsubscribe();
+        }
+
+        await client.disconnect();
+      }
     }
 
-    assert.equal(matchedEvents !== null, true);
+    if (!skipUnavailable) {
+      if (waiterError) {
+        if (isTimeoutError(waiterError)) {
+          context.skip(
+            "Chainlink client stream did not emit BTC price within timeout in this environment"
+          );
+        }
 
-    if (matchedEvents) {
-      assert.equal(matchedEvents.size, 1);
-      const latest = client.getLatestPrice("btc", "chainlink");
-      assert.equal(latest !== null, true);
+        throw waiterError;
+      }
+
+      assert.equal(matchedEvents !== null, true);
+
+      if (matchedEvents) {
+        assert.equal(matchedEvents.size, 1);
+        const latest = client.getLatestPrice("btc", "chainlink");
+        assert.equal(latest !== null, true);
+      }
     }
   }
 );

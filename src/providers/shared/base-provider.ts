@@ -33,6 +33,7 @@ const CLOSE_REASON_MANUAL_DISCONNECT = "manual-disconnect";
 export type WebSocketFactory = (url: string) => WebSocket;
 
 type OpenResult = { connected: boolean; reason: string };
+type OpenResultResolver = (result: OpenResult) => void;
 type BaseProviderConstructorOptions = {
   id: ProviderContract["id"];
   timeUtils: TimeUtils;
@@ -189,34 +190,31 @@ export abstract class BaseProvider implements ProviderContract {
     }
   }
 
-  private attachSocketListeners(socket: WebSocket, resolve: (result: OpenResult) => void): void {
-    let isSettled = false;
-
-    const settle = (result: OpenResult): void => {
-      if (!isSettled) {
-        isSettled = true;
-        resolve(result);
-      }
-    };
-
+  private attachOpenListener(socket: WebSocket, settle: OpenResultResolver): void {
     socket.on("open", () => {
       this.reconnectAttempt = 0;
       this.emitStatus("connected", "socket connected");
       this.sendSubscriptionMessages();
       settle({ connected: true, reason: "connected" });
     });
+  }
 
+  private attachMessageListener(socket: WebSocket): void {
     socket.on("message", (rawData: RawData) => {
       const text = this.decodeRawMessage(rawData);
       this.handleRawMessage(text);
     });
+  }
 
+  private attachErrorListener(socket: WebSocket, settle: OpenResultResolver): void {
     socket.on("error", (error: Error) => {
       const reason = error instanceof Error ? error.message : "unknown socket error";
       this.emitStatus("error", reason);
       settle({ connected: false, reason });
     });
+  }
 
+  private attachCloseListener(socket: WebSocket, settle: OpenResultResolver): void {
     socket.on("close", (_code: number, reasonBuffer: Buffer) => {
       const reasonText = Buffer.isBuffer(reasonBuffer)
         ? reasonBuffer.toString("utf8")
@@ -228,10 +226,23 @@ export abstract class BaseProvider implements ProviderContract {
         this.scheduleReconnect();
       }
 
-      if (!isSettled) {
-        settle({ connected: false, reason: closeReason });
-      }
+      settle({ connected: false, reason: closeReason });
     });
+  }
+
+  private attachSocketListeners(socket: WebSocket, resolve: OpenResultResolver): void {
+    let isSettled = false;
+
+    const settle = (result: OpenResult): void => {
+      if (!isSettled) {
+        isSettled = true;
+        resolve(result);
+      }
+    };
+    this.attachOpenListener(socket, settle);
+    this.attachMessageListener(socket);
+    this.attachErrorListener(socket, settle);
+    this.attachCloseListener(socket, settle);
   }
 
   private async openSocket(): Promise<OpenResult> {
@@ -265,8 +276,6 @@ export abstract class BaseProvider implements ProviderContract {
   /**
    * @section protected:methods
    */
-
-  // empty
 
   protected sendSubscriptionMessages(): void {
     const messages = this.buildSubscriptionMessages();

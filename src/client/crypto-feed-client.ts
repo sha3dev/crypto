@@ -11,7 +11,7 @@ import WebSocket from "ws";
 import { HistoryQueryService } from "../history/history-query-service.js";
 import { InMemoryHistoryStore } from "../history/in-memory-history-store.js";
 import type { HistoryRetentionConfig } from "../history/history-types.js";
-import CONFIG from "../config.js";
+import CONFIG from "../config.ts";
 import { BinanceProvider } from "../providers/binance/binance-provider.js";
 import { ChainlinkProvider } from "../providers/chainlink/chainlink-provider.js";
 import { CoinbaseProvider } from "../providers/coinbase/coinbase-provider.js";
@@ -67,6 +67,13 @@ type CreateProviderOptions = {
   symbols: CryptoSymbol[];
   timeUtils: TimeUtils;
   wsFactory: WebSocketFactory;
+};
+type CreateOrderBookProviderOptions = {
+  symbols: CryptoSymbol[];
+  timeUtils: TimeUtils;
+  wsFactory: WebSocketFactory;
+  providerOptions: ProviderBaseOptions;
+  bookMerger: OrderBookMerger;
 };
 type CreateProvidersOptions = {
   options: ClientOptions | undefined;
@@ -153,51 +160,88 @@ export class CryptoFeedClient {
     return retention;
   }
 
+  private static createBinanceProvider(options: CreateProviderOptions): ProviderContract {
+    const provider = BinanceProvider.create({
+      symbols: options.symbols,
+      timeUtils: options.timeUtils,
+      wsFactory: options.wsFactory,
+      providerOptions: DEFAULT_PROVIDER_OPTIONS
+    });
+    return provider;
+  }
+
+  private static createCoinbaseProvider(options: CreateOrderBookProviderOptions): ProviderContract {
+    const provider = CoinbaseProvider.create({
+      symbols: options.symbols,
+      maxLevels: DEFAULT_BOOK_LEVELS,
+      timeUtils: options.timeUtils,
+      wsFactory: options.wsFactory,
+      providerOptions: options.providerOptions,
+      bookMerger: options.bookMerger
+    });
+    return provider;
+  }
+
+  private static createKrakenProvider(options: CreateOrderBookProviderOptions): ProviderContract {
+    const provider = KrakenProvider.create({
+      symbols: options.symbols,
+      maxLevels: DEFAULT_BOOK_LEVELS,
+      timeUtils: options.timeUtils,
+      wsFactory: options.wsFactory,
+      providerOptions: options.providerOptions,
+      bookMerger: options.bookMerger
+    });
+    return provider;
+  }
+
+  private static createOkxProvider(options: CreateProviderOptions): ProviderContract {
+    const provider = OkxProvider.create({
+      symbols: options.symbols,
+      maxLevels: DEFAULT_BOOK_LEVELS,
+      timeUtils: options.timeUtils,
+      wsFactory: options.wsFactory,
+      providerOptions: DEFAULT_PROVIDER_OPTIONS
+    });
+    return provider;
+  }
+
+  private static createChainlinkProvider(options: CreateProviderOptions): ProviderContract {
+    const provider = ChainlinkProvider.create({
+      symbols: options.symbols,
+      timeUtils: options.timeUtils,
+      wsFactory: options.wsFactory,
+      providerOptions: DEFAULT_PROVIDER_OPTIONS
+    });
+    return provider;
+  }
+
   private static createProvider(options: CreateProviderOptions): ProviderContract {
     const providerOptions = DEFAULT_PROVIDER_OPTIONS;
     const merger = OrderBookMerger.create();
     let provider: ProviderContract;
 
     if (options.contractId === "binance") {
-      provider = BinanceProvider.create({
-        symbols: options.symbols,
-        timeUtils: options.timeUtils,
-        wsFactory: options.wsFactory,
-        providerOptions
-      });
+      provider = CryptoFeedClient.createBinanceProvider(options);
     } else if (options.contractId === "coinbase") {
-      provider = CoinbaseProvider.create({
+      provider = CryptoFeedClient.createCoinbaseProvider({
         symbols: options.symbols,
-        maxLevels: DEFAULT_BOOK_LEVELS,
         timeUtils: options.timeUtils,
         wsFactory: options.wsFactory,
         providerOptions,
         bookMerger: merger
       });
     } else if (options.contractId === "kraken") {
-      provider = KrakenProvider.create({
+      provider = CryptoFeedClient.createKrakenProvider({
         symbols: options.symbols,
-        maxLevels: DEFAULT_BOOK_LEVELS,
         timeUtils: options.timeUtils,
         wsFactory: options.wsFactory,
         providerOptions,
         bookMerger: merger
       });
     } else if (options.contractId === "okx") {
-      provider = OkxProvider.create({
-        symbols: options.symbols,
-        maxLevels: DEFAULT_BOOK_LEVELS,
-        timeUtils: options.timeUtils,
-        wsFactory: options.wsFactory,
-        providerOptions
-      });
+      provider = CryptoFeedClient.createOkxProvider(options);
     } else {
-      provider = ChainlinkProvider.create({
-        symbols: options.symbols,
-        timeUtils: options.timeUtils,
-        wsFactory: options.wsFactory,
-        providerOptions
-      });
+      provider = CryptoFeedClient.createChainlinkProvider(options);
     }
 
     return provider;

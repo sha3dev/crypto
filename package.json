@@ -28,7 +28,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test test/**/*.test.ts",
     "test:live": "LIVE_FEED_TESTS=1 node --import tsx --test test/integration/*.test.ts",
-    "publish": "npm publish --access public --ignore-scripts"
+    "publish": "node scripts/release-publish.mjs"
   },
   "dependencies": {
     "ws": "^8.18.3"
@@ -47,6 +47,14 @@
     "template": "node-lib",
     "profilePath": null,
     "withAiAdapters": true,
-    "lastRefreshWith": "0.1.8"
+    "lastRefreshWith": "0.1.17"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/crypto"
+  },
+  "homepage": "https://github.com/your-org/crypto#readme",
+  "bugs": {
+    "url": "https://github.com/your-org/crypto/issues"
   }
 }

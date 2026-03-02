@@ -9,7 +9,7 @@
  */
 
 import type { TimeUtils } from "../../shared/time-utils.js";
-import CONFIG from "../../config.js";
+import CONFIG from "../../config.ts";
 import { BaseProvider, type WebSocketFactory } from "../shared/base-provider.js";
 import type { ProviderBaseOptions, ProviderDataEvent } from "../shared/provider-types.js";
 import type { OkxEnvelope } from "./okx-types.js";
@@ -30,6 +30,13 @@ type OkxProviderOptions = {
   timeUtils: TimeUtils;
   wsFactory: WebSocketFactory;
   providerOptions: ProviderBaseOptions;
+};
+type DepthLevel = { price: number; size: number };
+type AppendOkxEventsOptions = {
+  events: ProviderDataEvent[];
+  channel: string;
+  symbol: string;
+  rows: Array<Record<string, unknown>>;
 };
 
 export class OkxProvider extends BaseProvider {
@@ -102,8 +109,8 @@ export class OkxProvider extends BaseProvider {
     return symbol;
   }
 
-  private parseDepthSide(rawLevels: unknown[]): { price: number; size: number }[] {
-    const levels: { price: number; size: number }[] = [];
+  private parseDepthSide(rawLevels: unknown[]): DepthLevel[] {
+    const levels: DepthLevel[] = [];
 
     for (const rawLevel of rawLevels) {
       const level = rawLevel as [string, string];
@@ -118,11 +125,59 @@ export class OkxProvider extends BaseProvider {
     return levels;
   }
 
+  private appendTickerEvents(options: AppendOkxEventsOptions): void {
+    if (options.channel === "tickers") {
+      for (const row of options.rows) {
+        const ts = Number(row.ts);
+        const price = Number(row.last);
+        const isValid = options.symbol.length > 0 && Number.isFinite(ts) && Number.isFinite(price);
+
+        if (isValid) {
+          options.events.push({
+            type: "price",
+            provider: this.id,
+            symbol: options.symbol,
+            ts,
+            price
+          });
+        }
+      }
+    }
+  }
+
+  private appendBookEvents(options: AppendOkxEventsOptions): void {
+    if (options.channel === "books5") {
+      for (const row of options.rows) {
+        const ts = Number(row.ts);
+        const asksRaw = Array.isArray(row.asks) ? row.asks : [];
+        const bidsRaw = Array.isArray(row.bids) ? row.bids : [];
+        const asks = this.parseDepthSide(asksRaw).sort((left, right) => {
+          const comparison = left.price - right.price;
+          return comparison;
+        });
+        const bids = this.parseDepthSide(bidsRaw).sort((left, right) => {
+          const comparison = right.price - left.price;
+          return comparison;
+        });
+        const isValid = options.symbol.length > 0 && Number.isFinite(ts);
+
+        if (isValid) {
+          options.events.push({
+            type: "orderbook",
+            provider: this.id,
+            symbol: options.symbol,
+            ts,
+            asks: asks.slice(0, this.maxLevels),
+            bids: bids.slice(0, this.maxLevels)
+          });
+        }
+      }
+    }
+  }
+
   /**
    * @section protected:methods
    */
-
-  // empty
 
   protected getConnectionUrl(): string {
     const url = OKX_WS_URL;
@@ -151,47 +206,10 @@ export class OkxProvider extends BaseProvider {
     const channel = envelope.arg?.channel ?? "";
     const instId = envelope.arg?.instId ?? "";
     const symbol = this.toSymbol(instId);
-    const rows = envelope.data ?? [];
-
-    if (channel === "tickers") {
-      for (const row of rows) {
-        const ts = Number(row.ts);
-        const price = Number(row.last);
-        const isValid = symbol.length > 0 && Number.isFinite(ts) && Number.isFinite(price);
-
-        if (isValid) {
-          events.push({ type: "price", provider: this.id, symbol, ts, price });
-        }
-      }
-    }
-
-    if (channel === "books5") {
-      for (const row of rows) {
-        const ts = Number(row.ts);
-        const asksRaw = Array.isArray(row.asks) ? row.asks : [];
-        const bidsRaw = Array.isArray(row.bids) ? row.bids : [];
-        const asks = this.parseDepthSide(asksRaw).sort((left, right) => {
-          const comparison = left.price - right.price;
-          return comparison;
-        });
-        const bids = this.parseDepthSide(bidsRaw).sort((left, right) => {
-          const comparison = right.price - left.price;
-          return comparison;
-        });
-        const isValid = symbol.length > 0 && Number.isFinite(ts);
-
-        if (isValid) {
-          events.push({
-            type: "orderbook",
-            provider: this.id,
-            symbol,
-            ts,
-            asks: asks.slice(0, this.maxLevels),
-            bids: bids.slice(0, this.maxLevels)
-          });
-        }
-      }
-    }
+    const rows = (envelope.data ?? []) as Array<Record<string, unknown>>;
+    const options: AppendOkxEventsOptions = { events, channel, symbol, rows };
+    this.appendTickerEvents(options);
+    this.appendBookEvents(options);
 
     return events;
   }

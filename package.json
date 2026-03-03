@@ -1,6 +1,6 @@
 {
   "name": "@sha3/crypto",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "private": false,
   "type": "module",
   "main": "dist/index.js",
@@ -31,6 +31,7 @@
     "publish": "node scripts/release-publish.mjs"
   },
   "dependencies": {
+    "@sha3/logger": "^2.0.0",
     "ws": "^8.18.3"
   },
   "devDependencies": {
@@ -47,7 +48,7 @@
     "template": "node-lib",
     "profilePath": null,
     "withAiAdapters": true,
-    "lastRefreshWith": "0.1.18"
+    "lastRefreshWith": "0.1.20"
   },
   "repository": {
     "type": "git",

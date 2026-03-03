@@ -9,6 +9,7 @@ import WebSocket, { type RawData } from "ws";
  */
 
 import type { TimeUtils } from "../../shared/time-utils.js";
+import logger from "../../shared/package-logger.js";
 import { ProviderConnectionError } from "./provider-connection-error.js";
 import { ProviderParseError } from "./provider-parse-error.js";
 import type { ProviderConnectionStatus } from "./provider-status.js";
@@ -119,7 +120,20 @@ export abstract class BaseProvider implements ProviderContract {
       status,
       message
     };
+    this.logStatus(status, message);
     this.emit(event);
+  }
+
+  private logStatus(status: ProviderConnectionStatus, message: string): void {
+    const logMessage = `[${this.id}] ${status}: ${message}`;
+
+    if (status === "error") {
+      logger.error(logMessage);
+    } else if (status === "reconnecting") {
+      logger.warn(logMessage);
+    } else {
+      logger.debug(logMessage);
+    }
   }
 
   private clearReconnectTimeout(): void {

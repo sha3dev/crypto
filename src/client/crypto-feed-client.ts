@@ -24,6 +24,7 @@ import type {
   ProviderContract
 } from "../providers/shared/provider-types.js";
 import { OrderBookMerger } from "../shared/order-book-merger.js";
+import logger from "../shared/package-logger.js";
 import { SymbolNormalizer } from "../shared/symbol-normalizer.js";
 import { TimeUtils } from "../shared/time-utils.js";
 import { NoProvidersConnectedError } from "./no-providers-connected-error.js";
@@ -295,6 +296,7 @@ export class CryptoFeedClient {
    */
 
   public async connect(): Promise<void> {
+    logger.debug("connect requested");
     const tasks: Promise<void>[] = [];
 
     for (const provider of this.providers) {
@@ -319,13 +321,21 @@ export class CryptoFeedClient {
     }
 
     if (connectedCount === 0) {
+      logger.error(`connect failed: no providers connected (${failedProviders.join(", ")})`);
       throw NoProvidersConnectedError.fromProviders(failedProviders);
+    }
+
+    if (failedProviders.length > 0) {
+      logger.warn(`partial connect success: failed providers (${failedProviders.join(", ")})`);
+    } else {
+      logger.debug("connect completed: all providers connected");
     }
 
     return;
   }
 
   public async disconnect(): Promise<void> {
+    logger.debug("disconnect requested");
     const tasks: Promise<void>[] = [];
 
     for (const provider of this.providers) {
@@ -334,6 +344,7 @@ export class CryptoFeedClient {
 
     await Promise.allSettled(tasks);
     this.listeners.clear();
+    logger.debug("disconnect completed");
     return;
   }
 

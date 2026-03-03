@@ -20,6 +20,9 @@ import type { ChainlinkEnvelope } from "./chainlink-types.js";
 
 const CHAINLINK_WS_URL = CONFIG.providerUrls.chainlink;
 const CHAINLINK_TOPIC = CONFIG.chainlink.topic;
+const CHAINLINK_PING_MESSAGE = "PING";
+const CHAINLINK_PONG_MESSAGE = "PONG";
+const CHAINLINK_PING_INTERVAL_MS = 5_000;
 
 /**
  * @section types
@@ -49,7 +52,7 @@ export class ChainlinkProvider extends BaseProvider {
    * @section private:properties
    */
 
-  // empty
+  private pingInterval: NodeJS.Timeout | null;
 
   /**
    * @section public:properties
@@ -69,6 +72,7 @@ export class ChainlinkProvider extends BaseProvider {
       providerOptions: options.providerOptions
     });
     this.symbols = this.normalizeConfiguredSymbols(options.symbols);
+    this.pingInterval = null;
   }
 
   /**
@@ -142,6 +146,20 @@ export class ChainlinkProvider extends BaseProvider {
     return events;
   }
 
+  private clearPingInterval(): void {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
+    }
+  }
+
+  private startPingInterval(): void {
+    this.clearPingInterval();
+    this.pingInterval = setInterval(() => {
+      this.sendSocketMessage(CHAINLINK_PING_MESSAGE);
+    }, CHAINLINK_PING_INTERVAL_MS);
+  }
+
   /**
    * @section protected:methods
    */
@@ -162,18 +180,30 @@ export class ChainlinkProvider extends BaseProvider {
 
   protected parseMessage(message: string): ProviderDataEvent[] {
     const events: ProviderDataEvent[] = [];
-    const raw = JSON.parse(message) as ChainlinkEnvelope | ChainlinkEnvelope[];
-    const envelopes = Array.isArray(raw) ? raw : [raw];
+    const normalizedMessage = message.trim().toUpperCase();
 
-    for (const envelope of envelopes) {
-      const parsed = this.parseEnvelope(envelope);
+    if (normalizedMessage !== CHAINLINK_PONG_MESSAGE) {
+      const raw = JSON.parse(message) as ChainlinkEnvelope | ChainlinkEnvelope[];
+      const envelopes = Array.isArray(raw) ? raw : [raw];
 
-      for (const event of parsed) {
-        events.push(event);
+      for (const envelope of envelopes) {
+        const parsed = this.parseEnvelope(envelope);
+
+        for (const event of parsed) {
+          events.push(event);
+        }
       }
     }
 
     return events;
+  }
+
+  protected onSocketConnected(): void {
+    this.startPingInterval();
+  }
+
+  protected onSocketDisconnected(): void {
+    this.clearPingInterval();
   }
 
   /**

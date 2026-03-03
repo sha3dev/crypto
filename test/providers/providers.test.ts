@@ -195,3 +195,23 @@ test("chainlink parser normalizes configured symbol formats", async () => {
   });
   assert.equal(hasPrice, true);
 });
+
+test("chainlink parser ignores PONG heartbeat frames", async () => {
+  const events: FeedEvent[] = [];
+  const provider = ChainlinkProvider.create({
+    symbols: ["btc"],
+    timeUtils: TimeUtils.createSystemTime(),
+    wsFactory: createNoopFactory(),
+    providerOptions: createOptions()
+  });
+
+  await armListener(provider, collectEvents(events));
+  provider.handleRawMessage("PONG");
+
+  const hasErrorStatus = events.some((event) => {
+    const keep = event.type === "status" && event.status === "error";
+    return keep;
+  });
+
+  assert.equal(hasErrorStatus, false);
+});

@@ -144,12 +144,20 @@ export abstract class BaseProvider implements ProviderContract {
   }
 
   private getReconnectDelayMs(): number {
+    let waitMs = 0;
     this.reconnectAttempt += 1;
-    const baseDelay = this.options.reconnectBaseDelayMs * 2 ** (this.reconnectAttempt - 1);
-    const cappedBaseDelay = Math.min(baseDelay, this.options.reconnectMaxDelayMs);
-    const jitterRange = Math.round(cappedBaseDelay * this.options.reconnectJitterRatio);
-    const jitter = Math.round(Math.random() * jitterRange);
-    const waitMs = cappedBaseDelay + jitter;
+
+    if (this.reconnectAttempt === 1) {
+      waitMs = 0;
+    } else {
+      const backoffAttempt = this.reconnectAttempt - 1;
+      const baseDelay = this.options.reconnectBaseDelayMs * 2 ** (backoffAttempt - 1);
+      const cappedBaseDelay = Math.min(baseDelay, this.options.reconnectMaxDelayMs);
+      const jitterRange = Math.round(cappedBaseDelay * this.options.reconnectJitterRatio);
+      const jitter = Math.round(Math.random() * jitterRange);
+      waitMs = cappedBaseDelay + jitter;
+    }
+
     return waitMs;
   }
 
@@ -199,6 +207,7 @@ export abstract class BaseProvider implements ProviderContract {
     if (this.socket) {
       const socket = this.socket;
       this.socket = null;
+      this.onSocketDisconnected();
       socket.removeAllListeners();
       socket.close();
     }
@@ -209,6 +218,7 @@ export abstract class BaseProvider implements ProviderContract {
       this.reconnectAttempt = 0;
       this.emitStatus("connected", "socket connected");
       this.sendSubscriptionMessages();
+      this.onSocketConnected();
       settle({ connected: true, reason: "connected" });
     });
   }
@@ -230,6 +240,7 @@ export abstract class BaseProvider implements ProviderContract {
 
   private attachCloseListener(socket: WebSocket, settle: OpenResultResolver): void {
     socket.on("close", (_code: number, reasonBuffer: Buffer) => {
+      this.onSocketDisconnected();
       const reasonText = Buffer.isBuffer(reasonBuffer)
         ? reasonBuffer.toString("utf8")
         : String(reasonBuffer ?? "");
@@ -299,6 +310,20 @@ export abstract class BaseProvider implements ProviderContract {
         this.socket.send(message);
       }
     }
+  }
+
+  protected sendSocketMessage(message: string): void {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(message);
+    }
+  }
+
+  protected onSocketConnected(): void {
+    // empty
+  }
+
+  protected onSocketDisconnected(): void {
+    // empty
   }
 
   protected abstract getConnectionUrl(): string;

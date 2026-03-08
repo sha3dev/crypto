@@ -2,24 +2,39 @@
 
 Node.js TypeScript library that normalizes real-time crypto feeds across Binance, Coinbase, Kraken, OKX, and Chainlink.
 
-It exposes a single backend-oriented API for:
-
-- live unified events (`price`, `orderbook`, `trade`, `status`),
-- resilient multi-provider connections,
-- latest snapshots,
-- historical range queries,
-- nearest-price lookup by timestamp.
-
 ## TL;DR
 
 ```bash
-npm i @sha3/crypto
+npm install
+npm run check
+npm run build
 ```
+
+## Installation
+
+```bash
+npm install @sha3/crypto
+```
+
+## Compatibility
+
+Requirements:
+
+- Node.js 20+
+- ESM runtime
+- outbound websocket access for live feeds
+
+## Public API
 
 ```ts
 import { CryptoFeedClient } from "@sha3/crypto";
 
-const client = CryptoFeedClient.create({ symbols: ["btc"], providers: ["binance", "chainlink"] });
+const client = CryptoFeedClient.create({
+  symbols: ["btc", "eth"],
+  providers: ["binance", "coinbase"]
+});
+
+await client.connect();
 
 const subscription = client.subscribe((event) => {
   if (event.type === "price") {
@@ -27,176 +42,109 @@ const subscription = client.subscribe((event) => {
   }
 });
 
-await client.connect();
-
-const now = Date.now();
-const prices = client.getPriceHistory({ symbol: "btc", fromTs: now - 60_000, toTs: now });
-console.log(prices.length);
-
+const latestPrice = client.getLatestPrice("btc");
 subscription.unsubscribe();
 await client.disconnect();
 ```
 
-## Why This Exists
-
-Provider payloads, symbols, and message semantics differ by exchange. This library isolates that complexity and provides one deterministic integration contract for application services and LLM-driven tooling.
-
-## Installation
-
-```bash
-npm i @sha3/crypto
-```
-
-## Compatibility
-
-- Node.js `>=20`
-- ESM runtime (`"type": "module"`)
-- TypeScript consumer support expected (package publishes `.d.ts`)
-- Outbound websocket network access required
-
-## Integration Guide (External Projects)
-
-1. Install `@sha3/crypto`.
-2. Import from package root only.
-3. Create one `CryptoFeedClient` per service boundary.
-4. Subscribe to feed events and route/persist as needed.
-5. Query latest/historical data through client methods.
-
-```ts
-import { CryptoFeedClient } from "@sha3/crypto";
-
-const client = CryptoFeedClient.create({
-  symbols: ["btc", "eth"],
-  providers: ["binance", "coinbase", "kraken", "okx", "chainlink"]
-});
-
-await client.connect();
-```
-
-Do not import internal modules like `src/*` from consuming projects.
-
-## Public API Reference
-
-### Class
+Root exports:
 
 - `CryptoFeedClient`
-  - `static create(options?: ClientOptions): CryptoFeedClient`
-  - `async connect(): Promise<void>`
-  - `async disconnect(): Promise<void>`
-  - `subscribe(listener: FeedEventListener): Subscription`
-  - `getLatestPrice(symbol, provider?)`
-  - `getLatestOrderBook(symbol, provider?)`
-  - `getLatestTrade(symbol, provider?)`
-  - `getPriceClosestTo(symbol, targetTs, provider?)`
-  - `getPriceHistory(query)`
-  - `getOrderBookHistory(query)`
-  - `getTradeHistory(query)`
-
-### Exported Types
-
 - `ClientOptions`
+- `FeedEventListener`
 - `HistoryQuery`
 - `RetentionOptions`
-- `FeedEvent`
-- `PricePoint`
-- `OrderBookSnapshot`
-- `TradePoint`
+- `Subscription`
 - `CryptoProviderId`
 - `CryptoSymbol`
-- `Subscription`
-
-### Exported Errors
-
+- `FeedEvent`
+- `OrderBookLevel`
+- `OrderBookSnapshot`
+- `PricePoint`
+- `ProviderStatusEvent`
+- `TradePoint`
 - `NoProvidersConnectedError`
 - `ProviderConnectionError`
 - `ProviderParseError`
 - `InvalidHistoryQueryError`
 
-### Behavior Expectations
+Behavior notes:
 
-- `connect()` attempts all selected providers in parallel.
-- `connect()` resolves if at least one provider connects.
-- If all fail, `connect()` throws `NoProvidersConnectedError`.
-- Range queries are inclusive (`fromTs <= ts <= toTs`).
-- Aggregated history (without `provider`) is sorted by timestamp asc, then provider id.
+- `connect()` attempts all configured providers in parallel.
+- `connect()` succeeds when at least one provider connects.
+- `connect()` throws `NoProvidersConnectedError` when every provider fails.
+- history queries are inclusive
+- merged history is sorted by timestamp ascending, then provider id
 
-## Configuration Reference (`src/config.ts`)
+## Integration Guide
 
-Runtime defaults are centralized in [`src/config.ts`](src/config.ts) as a single default object (`CONFIG`).
+1. Install the package from npm.
+2. Import only from the package root.
+3. Create one `CryptoFeedClient` per application boundary.
+4. Subscribe to events and persist or route them in your service layer.
+5. Query in-memory latest and historical views through the client methods.
 
-- `CONFIG.clientDefaults.symbols`
-  - default symbol list when `ClientOptions.symbols` is omitted.
-- `CONFIG.clientDefaults.providers`
-  - default provider list when `ClientOptions.providers` is omitted.
-- `CONFIG.clientDefaults.retention.windowMs`
-  - in-memory retention window (ms).
-- `CONFIG.clientDefaults.retention.maxSamplesPerStream`
-  - max retained `price/orderbook` points per stream.
-- `CONFIG.clientDefaults.retention.maxTradesPerStream`
-  - max retained `trade` points per stream.
-- `CONFIG.clientDefaults.orderBookLevels`
-  - depth used by provider adapters.
-- `CONFIG.providerConnection.reconnectBaseDelayMs`
-  - initial reconnect delay.
-- `CONFIG.providerConnection.reconnectMaxDelayMs`
-  - max reconnect delay cap.
-- `CONFIG.providerConnection.reconnectJitterRatio`
-  - jitter factor for reconnect backoff.
-- `CONFIG.providerConnection.connectTimeoutMs`
-  - connect timeout per provider.
-- `CONFIG.providerUrls.*`
-  - websocket endpoints by provider.
-- `CONFIG.chainlink.topic`
-  - Chainlink subscription topic.
+## Configuration
 
-## Testing
+Configuration lives in `src/config.ts`.
 
-Run deterministic checks:
+- `config.PACKAGE_NAME`
+- `config.clientDefaults.symbols`
+- `config.clientDefaults.providers`
+- `config.clientDefaults.retention.windowMs`
+- `config.clientDefaults.retention.maxSamplesPerStream`
+- `config.clientDefaults.retention.maxTradesPerStream`
+- `config.clientDefaults.orderBookLevels`
+- `config.providerConnection.reconnectBaseDelayMs`
+- `config.providerConnection.reconnectMaxDelayMs`
+- `config.providerConnection.reconnectJitterRatio`
+- `config.providerConnection.connectTimeoutMs`
+- `config.providerUrls.binance`
+- `config.providerUrls.coinbase`
+- `config.providerUrls.kraken`
+- `config.providerUrls.okx`
+- `config.providerUrls.chainlink`
+- `config.chainlink.topic`
 
-```bash
-npm run check
-```
+## Scripts
 
-Run live integration tests against real providers:
+- `npm run standards:check`
+- `npm run lint`
+- `npm run format:check`
+- `npm run typecheck`
+- `npm run test`
+- `npm run check`
+- `npm run build`
+- `npm run test:live`
 
-```bash
-npm run test:live
-```
+## Structure
 
-Live tests can skip provider-specific checks when endpoints are temporarily rate-limited or unavailable.
+- `src/client`: public client API and root-facing errors/types
+- `src/history`: in-memory retention and query semantics
+- `src/providers`: provider contracts and transport adapters
+- `src/shared`: shared internal services
+- `src/package-info`: scaffold-kept internal service
+- `test`: behavior, parser, reconnect, and live integration coverage
 
 ## Troubleshooting
 
 ### No providers connected
 
-- Verify websocket egress from your environment.
-- Inspect `status` events to identify the failing provider.
+- Verify websocket egress from the current environment.
+- Subscribe to `status` events to inspect provider failures.
 
 ### Missing historical points
 
-- Increase `ClientOptions.retention`.
-- Ensure process uptime is long enough to accumulate data.
+- Increase retention in `CryptoFeedClient.create({ retention: ... })`.
+- Keep the process alive long enough to accumulate in-memory history.
 
-### ESM import errors
+### ESM import issues
 
-- Ensure consumer project supports ESM imports on Node.js 20+.
+- Ensure the consumer runs on Node.js 20+ with ESM enabled.
 
-## AI Usage
+## AI Workflow
 
-When using assistants in this repo:
-
-1. Treat `AGENTS.md` as blocking contract.
-2. Keep class-first architecture and constructor injection.
-3. Keep single-return policy and control-flow braces.
-4. Keep `src/config.ts` as a single default object and import it as `import CONFIG from ".../config.ts"`.
-5. Update tests for behavior changes.
-6. Run `npm run check` before finalizing.
-
-## Development
-
-```bash
-npm install
-npm run check
-npm run test:live
-npm run build
-```
+- Read `AGENTS.md`, `ai/contract.json`, and the relevant adapter file before editing.
+- Keep managed files read-only unless this is an explicit standards update.
+- Preserve only the approved contract surfaces during refactors.
+- Run `npm run check` before finishing.

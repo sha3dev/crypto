@@ -1,216 +1,215 @@
 import * as assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { BinanceProvider } from "../../src/providers/binance/binance-provider.js";
-import { ChainlinkProvider } from "../../src/providers/chainlink/chainlink-provider.js";
-import { CoinbaseProvider } from "../../src/providers/coinbase/coinbase-provider.js";
-import { KrakenProvider } from "../../src/providers/kraken/kraken-provider.js";
-import { OkxProvider } from "../../src/providers/okx/okx-provider.js";
-import type { WebSocketFactory } from "../../src/providers/shared/base-provider.js";
-import type {
-  FeedEvent,
-  ProviderBaseOptions,
-  ProviderContract,
-  ProviderEventListener
-} from "../../src/providers/shared/provider-types.js";
-import { OrderBookMerger } from "../../src/shared/order-book-merger.js";
-import { TimeUtils } from "../../src/shared/time-utils.js";
+import { BinanceService } from "../../src/providers/binance/binance.service.ts";
+import { ChainlinkService } from "../../src/providers/chainlink/chainlink.service.ts";
+import { CoinbaseService } from "../../src/providers/coinbase/coinbase.service.ts";
+import { KrakenService } from "../../src/providers/kraken/kraken.service.ts";
+import { OkxService } from "../../src/providers/okx/okx.service.ts";
+import type { WebSocketFactory } from "../../src/providers/shared/base-provider.service.ts";
+import type { FeedEvent, ProviderBaseOptions, ProviderContract, ProviderEventListener } from "../../src/providers/shared/provider.types.ts";
+import { ClockService } from "../../src/shared/clock.service.ts";
+import { OrderBookMergerService } from "../../src/shared/order-book-merger.service.ts";
 
-const createNoopFactory = (): WebSocketFactory => {
-  const factory: WebSocketFactory = () => {
+const createNoopWebSocketFactory = (): WebSocketFactory => {
+  const webSocketFactory: WebSocketFactory = () => {
     throw new Error("ws not used in parser tests");
   };
-  return factory;
+  return webSocketFactory;
 };
 
-const createOptions = (): ProviderBaseOptions => {
-  const options: ProviderBaseOptions = {
+const createProviderOptions = (): ProviderBaseOptions => {
+  const providerOptions: ProviderBaseOptions = {
     reconnectBaseDelayMs: 10,
     reconnectMaxDelayMs: 20,
     reconnectJitterRatio: 0,
-    connectTimeoutMs: 100
+    connectTimeoutMs: 100,
   };
-  return options;
+  return providerOptions;
 };
 
-const collectEvents = (events: FeedEvent[]): ProviderEventListener => {
-  const listener: ProviderEventListener = (event: FeedEvent): void => {
-    events.push(event);
+const collectEvents = (capturedEvents: FeedEvent[]): ProviderEventListener => {
+  const providerListener: ProviderEventListener = (event: FeedEvent): void => {
+    capturedEvents.push(event);
   };
-  return listener;
+  return providerListener;
 };
 
-const armListener = async (
-  provider: ProviderContract,
-  listener: ProviderEventListener
-): Promise<void> => {
+const armListener = async (provider: ProviderContract, providerListener: ProviderEventListener): Promise<void> => {
   try {
-    await provider.connect(listener);
+    await provider.connect(providerListener);
   } catch {
     // intentional in parser tests: ws factory is a noop thrower
   }
 };
 
 test("binance parser emits price and trade from aggTrade", async () => {
-  const events: FeedEvent[] = [];
-  const provider = BinanceProvider.create({
+  const capturedEvents: FeedEvent[] = [];
+  const binanceService = BinanceService.create({
     symbols: ["btc"],
-    timeUtils: TimeUtils.createSystemTime(),
-    wsFactory: createNoopFactory(),
-    providerOptions: createOptions()
+    clockService: ClockService.createSystemClock(),
+    webSocketFactory: createNoopWebSocketFactory(),
+    providerOptions: createProviderOptions(),
   });
 
-  await armListener(provider, collectEvents(events));
-  provider.handleRawMessage(
-    JSON.stringify({ stream: "btcusdt@aggTrade", data: { E: 1000, p: "10", q: "2", m: false } })
+  await armListener(binanceService, collectEvents(capturedEvents));
+  binanceService.handleRawMessage(
+    JSON.stringify({
+      stream: "btcusdt@aggTrade",
+      data: { E: 1000, p: "10", q: "2", m: false },
+    }),
   );
 
-  const dataEvents = events.filter((event) => {
-    const keep = event.type !== "status";
-    return keep;
+  const parsedEvents = capturedEvents.filter((event) => {
+    const isNonStatusEvent = event.type !== "status";
+    return isNonStatusEvent;
   });
 
-  assert.equal(dataEvents.length, 2);
+  assert.equal(parsedEvents.length, 2);
 });
 
 test("coinbase parser handles invalid JSON by emitting error status", async () => {
-  const events: FeedEvent[] = [];
-  const provider = CoinbaseProvider.create({
+  const capturedEvents: FeedEvent[] = [];
+  const coinbaseService = CoinbaseService.create({
     symbols: ["btc"],
     maxLevels: 10,
-    timeUtils: TimeUtils.createSystemTime(),
-    wsFactory: createNoopFactory(),
-    providerOptions: createOptions(),
-    bookMerger: OrderBookMerger.create()
+    clockService: ClockService.createSystemClock(),
+    webSocketFactory: createNoopWebSocketFactory(),
+    providerOptions: createProviderOptions(),
+    orderBookMergerService: OrderBookMergerService.create(),
   });
 
-  await armListener(provider, collectEvents(events));
-  provider.handleRawMessage("{invalid");
+  await armListener(coinbaseService, collectEvents(capturedEvents));
+  coinbaseService.handleRawMessage("{invalid");
 
-  const hasErrorStatus = events.some((event) => {
-    const keep = event.type === "status" && event.status === "error";
-    return keep;
+  const hasErrorStatus = capturedEvents.some((event) => {
+    const isErrorStatus = event.type === "status" && event.status === "error";
+    return isErrorStatus;
   });
 
   assert.equal(hasErrorStatus, true);
 });
 
 test("kraken parser emits price event on ticker row", async () => {
-  const events: FeedEvent[] = [];
-  const provider = KrakenProvider.create({
+  const capturedEvents: FeedEvent[] = [];
+  const krakenService = KrakenService.create({
     symbols: ["btc"],
     maxLevels: 10,
-    timeUtils: TimeUtils.createSystemTime(),
-    wsFactory: createNoopFactory(),
-    providerOptions: createOptions(),
-    bookMerger: OrderBookMerger.create()
+    clockService: ClockService.createSystemClock(),
+    webSocketFactory: createNoopWebSocketFactory(),
+    providerOptions: createProviderOptions(),
+    orderBookMergerService: OrderBookMergerService.create(),
   });
 
-  await armListener(provider, collectEvents(events));
-  provider.handleRawMessage(
+  await armListener(krakenService, collectEvents(capturedEvents));
+  krakenService.handleRawMessage(
     JSON.stringify({
       channel: "ticker",
-      data: [{ symbol: "BTC/USD", last: 20, timestamp: "2024-01-01T00:00:00.000Z" }]
-    })
+      data: [{ symbol: "BTC/USD", last: 20, timestamp: "2024-01-01T00:00:00.000Z" }],
+    }),
   );
 
-  const hasPrice = events.some((event) => {
-    const keep = event.type === "price";
-    return keep;
+  const hasPriceEvent = capturedEvents.some((event) => {
+    const isPriceEvent = event.type === "price";
+    return isPriceEvent;
   });
-  assert.equal(hasPrice, true);
+
+  assert.equal(hasPriceEvent, true);
 });
 
 test("okx parser emits orderbook event on books5", async () => {
-  const events: FeedEvent[] = [];
-  const provider = OkxProvider.create({
+  const capturedEvents: FeedEvent[] = [];
+  const okxService = OkxService.create({
     symbols: ["btc"],
     maxLevels: 5,
-    timeUtils: TimeUtils.createSystemTime(),
-    wsFactory: createNoopFactory(),
-    providerOptions: createOptions()
+    clockService: ClockService.createSystemClock(),
+    webSocketFactory: createNoopWebSocketFactory(),
+    providerOptions: createProviderOptions(),
   });
 
-  await armListener(provider, collectEvents(events));
-  provider.handleRawMessage(
+  await armListener(okxService, collectEvents(capturedEvents));
+  okxService.handleRawMessage(
     JSON.stringify({
       arg: { channel: "books5", instId: "BTC-USDT" },
-      data: [{ ts: "1000", asks: [["11", "1"]], bids: [["10", "1"]] }]
-    })
+      data: [{ ts: "1000", asks: [["11", "1"]], bids: [["10", "1"]] }],
+    }),
   );
 
-  const hasBook = events.some((event) => {
-    const keep = event.type === "orderbook";
-    return keep;
+  const hasOrderBookEvent = capturedEvents.some((event) => {
+    const isOrderBookEvent = event.type === "orderbook";
+    return isOrderBookEvent;
   });
-  assert.equal(hasBook, true);
+
+  assert.equal(hasOrderBookEvent, true);
 });
 
 test("chainlink parser emits price update", async () => {
-  const events: FeedEvent[] = [];
-  const provider = ChainlinkProvider.create({
+  const capturedEvents: FeedEvent[] = [];
+  const chainlinkService = ChainlinkService.create({
     symbols: ["btc"],
-    timeUtils: TimeUtils.createSystemTime(),
-    wsFactory: createNoopFactory(),
-    providerOptions: createOptions()
+    clockService: ClockService.createSystemClock(),
+    webSocketFactory: createNoopWebSocketFactory(),
+    providerOptions: createProviderOptions(),
   });
 
-  await armListener(provider, collectEvents(events));
-  provider.handleRawMessage(
+  await armListener(chainlinkService, collectEvents(capturedEvents));
+  chainlinkService.handleRawMessage(
     JSON.stringify({
       topic: "crypto_prices_chainlink",
       type: "update",
-      payload: { symbol: "btc/usd", timestamp: 1000, value: 10 }
-    })
+      payload: { symbol: "btc/usd", timestamp: 1000, value: 10 },
+    }),
   );
 
-  const hasPrice = events.some((event) => {
-    const keep = event.type === "price";
-    return keep;
+  const hasPriceEvent = capturedEvents.some((event) => {
+    const isPriceEvent = event.type === "price";
+    return isPriceEvent;
   });
-  assert.equal(hasPrice, true);
+
+  assert.equal(hasPriceEvent, true);
 });
 
 test("chainlink parser normalizes configured symbol formats", async () => {
-  const events: FeedEvent[] = [];
-  const provider = ChainlinkProvider.create({
+  const capturedEvents: FeedEvent[] = [];
+  const chainlinkService = ChainlinkService.create({
     symbols: ["BTC/USD"],
-    timeUtils: TimeUtils.createSystemTime(),
-    wsFactory: createNoopFactory(),
-    providerOptions: createOptions()
+    clockService: ClockService.createSystemClock(),
+    webSocketFactory: createNoopWebSocketFactory(),
+    providerOptions: createProviderOptions(),
   });
 
-  await armListener(provider, collectEvents(events));
-  provider.handleRawMessage(
+  await armListener(chainlinkService, collectEvents(capturedEvents));
+  chainlinkService.handleRawMessage(
     JSON.stringify({
       topic: "crypto_prices_chainlink",
       type: "update",
-      payload: { symbol: "btc/usd", timestamp: 1000, value: 10 }
-    })
+      payload: { symbol: "btc/usd", timestamp: 1000, value: 10 },
+    }),
   );
 
-  const hasPrice = events.some((event) => {
-    const keep = event.type === "price";
-    return keep;
+  const hasPriceEvent = capturedEvents.some((event) => {
+    const isPriceEvent = event.type === "price";
+    return isPriceEvent;
   });
-  assert.equal(hasPrice, true);
+
+  assert.equal(hasPriceEvent, true);
 });
 
 test("chainlink parser ignores PONG heartbeat frames", async () => {
-  const events: FeedEvent[] = [];
-  const provider = ChainlinkProvider.create({
+  const capturedEvents: FeedEvent[] = [];
+  const chainlinkService = ChainlinkService.create({
     symbols: ["btc"],
-    timeUtils: TimeUtils.createSystemTime(),
-    wsFactory: createNoopFactory(),
-    providerOptions: createOptions()
+    clockService: ClockService.createSystemClock(),
+    webSocketFactory: createNoopWebSocketFactory(),
+    providerOptions: createProviderOptions(),
   });
 
-  await armListener(provider, collectEvents(events));
-  provider.handleRawMessage("PONG");
+  await armListener(chainlinkService, collectEvents(capturedEvents));
+  chainlinkService.handleRawMessage("PONG");
 
-  const hasErrorStatus = events.some((event) => {
-    const keep = event.type === "status" && event.status === "error";
-    return keep;
+  const hasErrorStatus = capturedEvents.some((event) => {
+    const isErrorStatus = event.type === "status" && event.status === "error";
+    return isErrorStatus;
   });
 
   assert.equal(hasErrorStatus, false);

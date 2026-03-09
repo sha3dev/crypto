@@ -1,5 +1,3 @@
-import type { ProviderConnectionStatus } from "./provider-status.types.ts";
-
 export type CryptoProviderId = "binance" | "coinbase" | "kraken" | "okx" | "chainlink";
 
 export type CryptoSymbol = string;
@@ -35,6 +33,8 @@ export type TradePoint = {
   size: number;
   buyerIsMaker: boolean;
 };
+
+export type ProviderConnectionStatus = "connected" | "reconnecting" | "error" | "disconnected";
 
 export type ProviderStatusEvent = {
   type: "status";

@@ -24,10 +24,7 @@ export class ClockService {
    */
 
   public static createSystemClock(): ClockService {
-    const service = new ClockService(() => {
-      const currentTime = Date.now();
-      return currentTime;
-    });
+    const service = new ClockService(() => Date.now());
     return service;
   }
 

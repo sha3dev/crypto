@@ -2,10 +2,11 @@
  * @section imports:internals
  */
 
-import config from "../../config.ts";
-import type { ClockService } from "../../shared/clock.service.ts";
-import { BaseProviderService, type WebSocketFactory } from "../shared/base-provider.service.ts";
-import type { ProviderBaseOptions, ProviderDataEvent } from "../shared/provider.types.ts";
+import config from "../config.ts";
+import { ProviderService } from "../provider/provider.service.ts";
+import type { WebSocketFactory } from "../provider/provider.service.ts";
+import type { ProviderBaseOptions, ProviderDataEvent } from "../provider/provider.types.ts";
+import type { ClockService } from "../time/clock.service.ts";
 import type { ChainlinkEnvelope } from "./chainlink.types.ts";
 
 /**
@@ -29,7 +30,9 @@ type ChainlinkServiceOptions = {
   providerOptions: ProviderBaseOptions;
 };
 
-export class ChainlinkService extends BaseProviderService {
+const PROVIDER_SERVICE_CLASS = ProviderService;
+
+export class ChainlinkService extends PROVIDER_SERVICE_CLASS {
   /**
    * @section private:attributes
    */
@@ -110,13 +113,7 @@ export class ChainlinkService extends BaseProviderService {
       const isValidEvent = this.shouldIncludeSymbol(symbol) && Number.isFinite(ts) && Number.isFinite(price);
 
       if (isValidEvent) {
-        parsedEvents.push({
-          type: "price",
-          provider: this.id,
-          symbol,
-          ts,
-          price,
-        });
+        parsedEvents.push({ type: "price", provider: this.id, symbol, ts, price });
       }
     }
 
@@ -124,7 +121,7 @@ export class ChainlinkService extends BaseProviderService {
   }
 
   private clearPingInterval(): void {
-    if (this.pingInterval) {
+    if (this.pingInterval !== null) {
       clearInterval(this.pingInterval);
       this.pingInterval = null;
     }

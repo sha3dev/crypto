@@ -2,18 +2,16 @@
  * @section imports:externals
  */
 
-import WebSocket, { type RawData } from "ws";
+import WebSocket from "ws";
+import type { RawData } from "ws";
 
 /**
  * @section imports:internals
  */
 
-import logger from "../../logger.ts";
-import type { ClockService } from "../../shared/clock.service.ts";
-import { ProviderConnectionError } from "./provider-connection.errors.ts";
-import { ProviderParseError } from "./provider-parse.errors.ts";
-import type { ProviderConnectionStatus } from "./provider-status.types.ts";
-import type { FeedEvent, ProviderBaseOptions, ProviderContract, ProviderDataEvent, ProviderEventListener } from "./provider.types.ts";
+import logger from "../logger.ts";
+import type { ClockService } from "../time/clock.service.ts";
+import type { FeedEvent, ProviderBaseOptions, ProviderConnectionStatus, ProviderContract, ProviderDataEvent, ProviderEventListener } from "./provider.types.ts";
 
 /**
  * @section consts
@@ -34,14 +32,14 @@ type OpenSocketResult = {
 
 type OpenSocketResolver = (result: OpenSocketResult) => void;
 
-type BaseProviderConstructorOptions = {
+type ProviderServiceOptions = {
   id: ProviderContract["id"];
   clockService: ClockService;
   webSocketFactory: WebSocketFactory;
   providerOptions: ProviderBaseOptions;
 };
 
-export abstract class BaseProviderService implements ProviderContract {
+export abstract class ProviderService implements ProviderContract {
   /**
    * @section private:attributes
    */
@@ -70,7 +68,7 @@ export abstract class BaseProviderService implements ProviderContract {
    * @section constructor
    */
 
-  public constructor(options: BaseProviderConstructorOptions) {
+  public constructor(options: ProviderServiceOptions) {
     this.id = options.id;
     this.clockService = options.clockService;
     this.webSocketFactory = options.webSocketFactory;
@@ -87,19 +85,13 @@ export abstract class BaseProviderService implements ProviderContract {
    */
 
   private emit(event: FeedEvent): void {
-    if (this.listener) {
+    if (this.listener !== null) {
       this.listener(event);
     }
   }
 
   private emitStatus(status: ProviderConnectionStatus, message: string): void {
-    const event: FeedEvent = {
-      type: "status",
-      provider: this.id,
-      ts: this.clockService.now(),
-      status,
-      message,
-    };
+    const event: FeedEvent = { type: "status", provider: this.id, ts: this.clockService.now(), status, message };
     this.logStatus(status, message);
     this.emit(event);
   }
@@ -109,15 +101,17 @@ export abstract class BaseProviderService implements ProviderContract {
 
     if (status === "error") {
       logger.error(logMessage);
-    } else if (status === "reconnecting") {
-      logger.warn(logMessage);
     } else {
-      logger.debug(logMessage);
+      if (status === "reconnecting") {
+        logger.warn(logMessage);
+      } else {
+        logger.debug(logMessage);
+      }
     }
   }
 
   private clearReconnectTimeout(): void {
-    if (this.reconnectTimeout) {
+    if (this.reconnectTimeout !== null) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
     }
@@ -127,9 +121,7 @@ export abstract class BaseProviderService implements ProviderContract {
     let reconnectDelayMs = 0;
     this.reconnectAttempt += 1;
 
-    if (this.reconnectAttempt === 1) {
-      reconnectDelayMs = 0;
-    } else {
+    if (this.reconnectAttempt > 1) {
       const backoffAttempt = this.reconnectAttempt - 1;
       const baseDelay = this.providerOptions.reconnectBaseDelayMs * 2 ** (backoffAttempt - 1);
       const cappedBaseDelay = Math.min(baseDelay, this.providerOptions.reconnectMaxDelayMs);
@@ -173,19 +165,23 @@ export abstract class BaseProviderService implements ProviderContract {
 
     if (typeof rawMessage === "string") {
       messageText = rawMessage;
-    } else if (Buffer.isBuffer(rawMessage)) {
-      messageText = rawMessage.toString("utf8");
-    } else if (Array.isArray(rawMessage)) {
-      messageText = Buffer.concat(rawMessage).toString("utf8");
     } else {
-      messageText = Buffer.from(rawMessage).toString("utf8");
+      if (Buffer.isBuffer(rawMessage)) {
+        messageText = rawMessage.toString("utf8");
+      } else {
+        if (Array.isArray(rawMessage)) {
+          messageText = Buffer.concat(rawMessage).toString("utf8");
+        } else {
+          messageText = Buffer.from(rawMessage).toString("utf8");
+        }
+      }
     }
 
     return messageText;
   }
 
   private closeActiveSocket(): void {
-    if (this.socket) {
+    if (this.socket !== null) {
       const activeSocket = this.socket;
       this.socket = null;
       this.onSocketDisconnected();
@@ -253,7 +249,6 @@ export abstract class BaseProviderService implements ProviderContract {
     this.closeActiveSocket();
     const socket = this.webSocketFactory(this.getConnectionUrl());
     this.socket = socket;
-
     const openSocketPromise = new Promise<OpenSocketResult>((resolve) => {
       const connectTimeout = setTimeout(() => {
         resolve({ isConnected: false, reason: "connection timeout" });
@@ -282,12 +277,11 @@ export abstract class BaseProviderService implements ProviderContract {
     const canSend = this.socket !== null && this.socket.readyState === WebSocket.OPEN;
 
     if (canSend) {
-      const socket = this.socket;
-      const hasSocket = socket !== null;
+      const activeSocket = this.socket;
 
-      if (hasSocket) {
+      if (activeSocket !== null) {
         for (const subscriptionMessage of subscriptionMessages) {
-          socket.send(subscriptionMessage);
+          activeSocket.send(subscriptionMessage);
         }
       }
     }
@@ -297,11 +291,10 @@ export abstract class BaseProviderService implements ProviderContract {
     const canSend = this.socket !== null && this.socket.readyState === WebSocket.OPEN;
 
     if (canSend) {
-      const socket = this.socket;
-      const hasSocket = socket !== null;
+      const activeSocket = this.socket;
 
-      if (hasSocket) {
-        socket.send(messageText);
+      if (activeSocket !== null) {
+        activeSocket.send(messageText);
       }
     }
   }
@@ -327,7 +320,7 @@ export abstract class BaseProviderService implements ProviderContract {
     const openSocketResult = await this.openSocket();
 
     if (!openSocketResult.isConnected) {
-      throw ProviderConnectionError.fromReason(this.id, openSocketResult.reason);
+      throw new Error(`Provider '${this.id}' connection failed: ${openSocketResult.reason}`);
     }
   }
 
@@ -348,7 +341,8 @@ export abstract class BaseProviderService implements ProviderContract {
       }
     } catch (error) {
       const parseReason = error instanceof Error ? error.message : "unknown parse error";
-      const parseError = ProviderParseError.fromReason(this.id, parseReason);
+      const parseError = new Error(`Provider '${this.id}' parse failed: ${parseReason}`);
+      logger.error(parseError.message);
       this.emitStatus("error", parseError.message);
     }
   }

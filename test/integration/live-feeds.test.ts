@@ -3,10 +3,10 @@ import { test } from "node:test";
 
 import { CryptoFeedClient } from "../../src/index.ts";
 
-const isLiveFeedTestsEnabled = process.env.LIVE_FEED_TESTS === "1";
+const IS_LIVE_FEED_TESTS_ENABLED = process.env.LIVE_FEED_TESTS === "1";
 const WAIT_TIMEOUT_MS = 90_000;
 
-const waitForPrice = async (client: CryptoFeedClient): Promise<void> => {
+const WAIT_FOR_PRICE = async (client: CryptoFeedClient): Promise<void> => {
   const pricePromise = new Promise<void>((resolve, reject) => {
     const timeoutHandle = setTimeout(() => {
       reject(new Error("Timed out waiting for price event"));
@@ -26,7 +26,7 @@ const waitForPrice = async (client: CryptoFeedClient): Promise<void> => {
 };
 
 test("live feeds produce at least one btc price when enabled", async (testContext) => {
-  if (!isLiveFeedTestsEnabled) {
+  if (!IS_LIVE_FEED_TESTS_ENABLED) {
     testContext.skip("LIVE_FEED_TESTS is not enabled");
   }
 
@@ -37,7 +37,7 @@ test("live feeds produce at least one btc price when enabled", async (testContex
 
   try {
     await client.connect();
-    await waitForPrice(client);
+    await WAIT_FOR_PRICE(client);
     const latestPrice = client.getLatestPrice("btc");
     const hasLatestPrice = latestPrice !== null;
     assert.equal(hasLatestPrice, true);

@@ -12,11 +12,11 @@ export type PackageInfo = { packageName: string };
 
 type PackageInfoServiceOptions = { packageName: string };
 
-export class PackageInfoService {
-  /**
-   * @section private:properties
-   */
+/**
+ * @section public:properties
+ */
 
+export class PackageInfoService {
   private readonly packageName: string;
 
   /**
@@ -32,7 +32,8 @@ export class PackageInfoService {
    */
 
   public static createDefault(): PackageInfoService {
-    return new PackageInfoService({ packageName: config.PACKAGE_NAME });
+    const service = new PackageInfoService({ packageName: config.PACKAGE_NAME });
+    return service;
   }
 
   /**
@@ -40,6 +41,7 @@ export class PackageInfoService {
    */
 
   public readPackageInfo(): PackageInfo {
-    return { packageName: this.packageName };
+    const packageInfo: PackageInfo = { packageName: this.packageName };
+    return packageInfo;
   }
 }

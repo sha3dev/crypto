@@ -3,39 +3,39 @@
  */
 
 import type { HistoryQuery } from "../client/client.types.ts";
-import type { CryptoProviderId, CryptoSymbol, OrderBookSnapshot, PricePoint, TradePoint } from "../providers/shared/provider.types.ts";
-import type { SymbolNormalizerService } from "../shared/symbol-normalizer.service.ts";
-import type { InMemoryHistoryService } from "./in-memory-history.service.ts";
-import { InvalidHistoryQueryError } from "./invalid-history-query.errors.ts";
+import type { CryptoProviderId, CryptoSymbol, OrderBookSnapshot, PricePoint, TradePoint } from "../provider/provider.types.ts";
+import type { SymbolService } from "../symbol/symbol.service.ts";
+import type { HistoryStoreService } from "./history-store.service.ts";
+import type { HistoryRangeQuery } from "./history.types.ts";
 
 export class HistoryQueryService {
   /**
    * @section private:attributes
    */
 
-  private readonly historyService: InMemoryHistoryService;
+  private readonly historyStoreService: HistoryStoreService;
 
   /**
    * @section private:properties
    */
 
-  private readonly symbolNormalizerService: SymbolNormalizerService;
+  private readonly symbolService: SymbolService;
 
   /**
    * @section constructor
    */
 
-  public constructor(historyService: InMemoryHistoryService, symbolNormalizerService: SymbolNormalizerService) {
-    this.historyService = historyService;
-    this.symbolNormalizerService = symbolNormalizerService;
+  public constructor(historyStoreService: HistoryStoreService, symbolService: SymbolService) {
+    this.historyStoreService = historyStoreService;
+    this.symbolService = symbolService;
   }
 
   /**
    * @section factory
    */
 
-  public static create(historyService: InMemoryHistoryService, symbolNormalizerService: SymbolNormalizerService): HistoryQueryService {
-    const service = new HistoryQueryService(historyService, symbolNormalizerService);
+  public static create(historyStoreService: HistoryStoreService, symbolService: SymbolService): HistoryQueryService {
+    const service = new HistoryQueryService(historyStoreService, symbolService);
     return service;
   }
 
@@ -47,44 +47,32 @@ export class HistoryQueryService {
     const isFiniteRange = Number.isFinite(fromTs) && Number.isFinite(toTs);
 
     if (!isFiniteRange) {
-      throw InvalidHistoryQueryError.forReason("fromTs and toTs must be finite numbers");
+      throw new Error("fromTs and toTs must be finite numbers");
     }
 
     if (fromTs > toTs) {
-      throw InvalidHistoryQueryError.forReason("fromTs must be less than or equal to toTs");
+      throw new Error("fromTs must be less than or equal to toTs");
     }
   }
 
   private normalizeSymbol(symbol: CryptoSymbol): CryptoSymbol {
-    const normalizedSymbol = this.symbolNormalizerService.normalizeSymbol(symbol);
+    const normalizedSymbol = this.symbolService.normalizeSymbol(symbol);
 
     if (normalizedSymbol.length === 0) {
-      throw InvalidHistoryQueryError.forReason("symbol is required");
+      throw new Error("symbol is required");
     }
 
     return normalizedSymbol;
   }
 
-  private toRangeQuery(eventType: "price" | "orderbook" | "trade", query: HistoryQuery): HistoryQuery {
+  private toRangeQuery(eventType: "price" | "orderbook" | "trade", query: HistoryQuery): HistoryRangeQuery {
     const normalizedSymbol = this.normalizeSymbol(query.symbol);
-    const normalizedProvider = query.provider;
     this.validateRange(query.fromTs, query.toTs);
-    const rangeQuery =
-      normalizedProvider === undefined
-        ? {
-            eventType,
-            symbol: normalizedSymbol,
-            fromTs: query.fromTs,
-            toTs: query.toTs,
-          }
-        : {
-            eventType,
-            symbol: normalizedSymbol,
-            fromTs: query.fromTs,
-            toTs: query.toTs,
-            provider: normalizedProvider,
-          };
-    return rangeQuery as unknown as HistoryQuery;
+    const rangeQuery: HistoryRangeQuery =
+      query.provider === undefined
+        ? { eventType, symbol: normalizedSymbol, fromTs: query.fromTs, toTs: query.toTs }
+        : { eventType, symbol: normalizedSymbol, fromTs: query.fromTs, toTs: query.toTs, provider: query.provider };
+    return rangeQuery;
   }
 
   /**
@@ -93,19 +81,19 @@ export class HistoryQueryService {
 
   public getLatestPrice(symbol: CryptoSymbol, provider?: CryptoProviderId): PricePoint | null {
     const normalizedSymbol = this.normalizeSymbol(symbol);
-    const latestPoint = this.historyService.getLatest("price", normalizedSymbol, provider);
+    const latestPoint = this.historyStoreService.getLatest("price", normalizedSymbol, provider);
     return latestPoint as PricePoint | null;
   }
 
   public getLatestOrderBook(symbol: CryptoSymbol, provider?: CryptoProviderId): OrderBookSnapshot | null {
     const normalizedSymbol = this.normalizeSymbol(symbol);
-    const latestPoint = this.historyService.getLatest("orderbook", normalizedSymbol, provider);
+    const latestPoint = this.historyStoreService.getLatest("orderbook", normalizedSymbol, provider);
     return latestPoint as OrderBookSnapshot | null;
   }
 
   public getLatestTrade(symbol: CryptoSymbol, provider?: CryptoProviderId): TradePoint | null {
     const normalizedSymbol = this.normalizeSymbol(symbol);
-    const latestPoint = this.historyService.getLatest("trade", normalizedSymbol, provider);
+    const latestPoint = this.historyStoreService.getLatest("trade", normalizedSymbol, provider);
     return latestPoint as TradePoint | null;
   }
 
@@ -114,28 +102,28 @@ export class HistoryQueryService {
     const isFiniteTarget = Number.isFinite(targetTs);
 
     if (!isFiniteTarget) {
-      throw InvalidHistoryQueryError.forReason("targetTs must be a finite number");
+      throw new Error("targetTs must be a finite number");
     }
 
-    const closestPoint = this.historyService.getClosestPrice(normalizedSymbol, targetTs, provider);
+    const closestPoint = this.historyStoreService.getClosestPrice(normalizedSymbol, targetTs, provider);
     return closestPoint;
   }
 
   public getPriceHistory(query: HistoryQuery): PricePoint[] {
     const rangeQuery = this.toRangeQuery("price", query);
-    const historyPoints = this.historyService.getRange(rangeQuery as never);
+    const historyPoints = this.historyStoreService.getRange(rangeQuery);
     return historyPoints as PricePoint[];
   }
 
   public getOrderBookHistory(query: HistoryQuery): OrderBookSnapshot[] {
     const rangeQuery = this.toRangeQuery("orderbook", query);
-    const historyPoints = this.historyService.getRange(rangeQuery as never);
+    const historyPoints = this.historyStoreService.getRange(rangeQuery);
     return historyPoints as OrderBookSnapshot[];
   }
 
   public getTradeHistory(query: HistoryQuery): TradePoint[] {
     const rangeQuery = this.toRangeQuery("trade", query);
-    const historyPoints = this.historyService.getRange(rangeQuery as never);
+    const historyPoints = this.historyStoreService.getRange(rangeQuery);
     return historyPoints as TradePoint[];
   }
 }

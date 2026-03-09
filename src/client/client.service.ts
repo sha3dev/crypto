@@ -8,24 +8,23 @@ import WebSocket from "ws";
  * @section imports:internals
  */
 
+import { BinanceService } from "../binance/binance.service.ts";
+import { ChainlinkService } from "../chainlink/chainlink.service.ts";
+import { CoinbaseService } from "../coinbase/coinbase.service.ts";
 import config from "../config.ts";
 import { HistoryQueryService } from "../history/history-query.service.ts";
+import { HistoryStoreService } from "../history/history-store.service.ts";
 import type { HistoryRetentionConfig } from "../history/history.types.ts";
-import { InMemoryHistoryService } from "../history/in-memory-history.service.ts";
+import { KrakenService } from "../kraken/kraken.service.ts";
 import logger from "../logger.ts";
-import { BinanceService } from "../providers/binance/binance.service.ts";
-import { ChainlinkService } from "../providers/chainlink/chainlink.service.ts";
-import { CoinbaseService } from "../providers/coinbase/coinbase.service.ts";
-import { KrakenService } from "../providers/kraken/kraken.service.ts";
-import { OkxService } from "../providers/okx/okx.service.ts";
-import { BaseProviderService, type WebSocketFactory } from "../providers/shared/base-provider.service.ts";
-import type { FeedEvent, ProviderBaseOptions, ProviderContract } from "../providers/shared/provider.types.ts";
-import type { CryptoProviderId, CryptoSymbol, OrderBookSnapshot, PricePoint, TradePoint } from "../providers/shared/provider.types.ts";
-import { ClockService } from "../shared/clock.service.ts";
-import { OrderBookMergerService } from "../shared/order-book-merger.service.ts";
-import { SymbolNormalizerService } from "../shared/symbol-normalizer.service.ts";
+import { OkxService } from "../okx/okx.service.ts";
+import { OrderBookService } from "../order-book/order-book.service.ts";
+import type { WebSocketFactory } from "../provider/provider.service.ts";
+import type { CryptoProviderId, CryptoSymbol, FeedEvent, OrderBookSnapshot, PricePoint, ProviderBaseOptions, ProviderContract, TradePoint } from "../provider/provider.types.ts";
+import { SymbolService } from "../symbol/symbol.service.ts";
+import { ClockService } from "../time/clock.service.ts";
+import { NoProvidersConnectedError } from "./client.errors.ts";
 import type { ClientOptions, FeedEventListener, HistoryQuery, RetentionOptions, Subscription } from "./client.types.ts";
-import { NoProvidersConnectedError } from "./no-providers-connected.errors.ts";
 
 /**
  * @section consts
@@ -41,16 +40,16 @@ const DEFAULT_ORDER_BOOK_LEVELS = config.clientDefaults.orderBookLevels;
  * @section types
  */
 
-type CryptoFeedClientConstructorOptions = {
+type ClientServiceOptions = {
   providers: ProviderContract[];
-  historyService: InMemoryHistoryService;
+  historyStoreService: HistoryStoreService;
   historyQueryService: HistoryQueryService;
   clockService: ClockService;
 };
 
 type CreateProvidersOptions = {
   clientOptions: ClientOptions | undefined;
-  symbolNormalizerService: SymbolNormalizerService;
+  symbolService: SymbolService;
   clockService: ClockService;
 };
 
@@ -61,13 +60,82 @@ type ProviderCreationOptions = {
   webSocketFactory: WebSocketFactory;
 };
 
+function toRetentionConfig(retentionOverrides?: Partial<RetentionOptions>): HistoryRetentionConfig {
+  const retentionConfig: HistoryRetentionConfig = {
+    windowMs: retentionOverrides?.windowMs ?? DEFAULT_RETENTION.windowMs,
+    maxSamplesPerStream: retentionOverrides?.maxSamplesPerStream ?? DEFAULT_RETENTION.maxSamplesPerStream,
+    maxTradesPerStream: retentionOverrides?.maxTradesPerStream ?? DEFAULT_RETENTION.maxTradesPerStream,
+  };
+  return retentionConfig;
+}
+
+function createProvider(options: ProviderCreationOptions): ProviderContract {
+  const orderBookService = OrderBookService.create();
+  let provider: ProviderContract;
+
+  if (options.providerId === "binance") {
+    provider = BinanceService.create({ symbols: options.symbols, clockService: options.clockService, webSocketFactory: options.webSocketFactory, providerOptions: DEFAULT_PROVIDER_OPTIONS });
+  } else {
+    if (options.providerId === "coinbase") {
+      provider = CoinbaseService.create({
+        symbols: options.symbols,
+        maxLevels: DEFAULT_ORDER_BOOK_LEVELS,
+        clockService: options.clockService,
+        webSocketFactory: options.webSocketFactory,
+        providerOptions: DEFAULT_PROVIDER_OPTIONS,
+        orderBookService,
+      });
+    } else {
+      if (options.providerId === "kraken") {
+        provider = KrakenService.create({
+          symbols: options.symbols,
+          maxLevels: DEFAULT_ORDER_BOOK_LEVELS,
+          clockService: options.clockService,
+          webSocketFactory: options.webSocketFactory,
+          providerOptions: DEFAULT_PROVIDER_OPTIONS,
+          orderBookService,
+        });
+      } else {
+        if (options.providerId === "okx") {
+          provider = OkxService.create({
+            symbols: options.symbols,
+            maxLevels: DEFAULT_ORDER_BOOK_LEVELS,
+            clockService: options.clockService,
+            webSocketFactory: options.webSocketFactory,
+            providerOptions: DEFAULT_PROVIDER_OPTIONS,
+          });
+        } else {
+          provider = ChainlinkService.create({ symbols: options.symbols, clockService: options.clockService, webSocketFactory: options.webSocketFactory, providerOptions: DEFAULT_PROVIDER_OPTIONS });
+        }
+      }
+    }
+  }
+
+  return provider;
+}
+
+function createProviders(options: CreateProvidersOptions): ProviderContract[] {
+  const rawSymbols = options.clientOptions?.symbols ?? DEFAULT_SYMBOLS;
+  const normalizedSymbols = options.symbolService.normalizeSymbols(rawSymbols);
+  const providerIds = options.clientOptions?.providers ?? DEFAULT_PROVIDERS;
+  const providers: ProviderContract[] = [];
+  const webSocketFactory: WebSocketFactory = (connectionUrl) => new WebSocket(connectionUrl);
+
+  for (const providerId of providerIds) {
+    const provider = createProvider({ providerId, symbols: normalizedSymbols, clockService: options.clockService, webSocketFactory });
+    providers.push(provider);
+  }
+
+  return providers;
+}
+
 export class CryptoFeedClient {
   /**
    * @section private:attributes
    */
 
   private readonly providers: ProviderContract[];
-  private readonly historyService: InMemoryHistoryService;
+  private readonly historyStoreService: HistoryStoreService;
   private readonly historyQueryService: HistoryQueryService;
   private readonly clockService: ClockService;
 
@@ -81,9 +149,9 @@ export class CryptoFeedClient {
    * @section constructor
    */
 
-  public constructor(options: CryptoFeedClientConstructorOptions) {
+  public constructor(options: ClientServiceOptions) {
     this.providers = options.providers;
-    this.historyService = options.historyService;
+    this.historyStoreService = options.historyStoreService;
     this.historyQueryService = options.historyQueryService;
     this.clockService = options.clockService;
     this.listeners = new Set<FeedEventListener>();
@@ -94,109 +162,19 @@ export class CryptoFeedClient {
    */
 
   public static create(clientOptions?: ClientOptions): CryptoFeedClient {
-    const symbolNormalizerService = SymbolNormalizerService.create();
+    const symbolService = SymbolService.create();
     const clockService = ClockService.createSystemClock();
-    const retentionConfig = CryptoFeedClient.toRetentionConfig(clientOptions?.retention);
-    const historyService = InMemoryHistoryService.create(retentionConfig);
-    const historyQueryService = HistoryQueryService.create(historyService, symbolNormalizerService);
-    const providers = CryptoFeedClient.createProviders({
-      clientOptions,
-      symbolNormalizerService,
-      clockService,
-    });
-    const client = new CryptoFeedClient({
-      providers,
-      historyService,
-      historyQueryService,
-      clockService,
-    });
+    const retentionConfig = toRetentionConfig(clientOptions?.retention);
+    const historyStoreService = HistoryStoreService.create(retentionConfig);
+    const historyQueryService = HistoryQueryService.create(historyStoreService, symbolService);
+    const providers = createProviders({ clientOptions, symbolService, clockService });
+    const client = new CryptoFeedClient({ providers, historyStoreService, historyQueryService, clockService });
     return client;
   }
 
   /**
    * @section private:methods
    */
-
-  private static toRetentionConfig(retentionOverrides?: Partial<RetentionOptions>): HistoryRetentionConfig {
-    const retentionConfig: HistoryRetentionConfig = {
-      windowMs: retentionOverrides?.windowMs ?? DEFAULT_RETENTION.windowMs,
-      maxSamplesPerStream: retentionOverrides?.maxSamplesPerStream ?? DEFAULT_RETENTION.maxSamplesPerStream,
-      maxTradesPerStream: retentionOverrides?.maxTradesPerStream ?? DEFAULT_RETENTION.maxTradesPerStream,
-    };
-    return retentionConfig;
-  }
-
-  private static createProvider(options: ProviderCreationOptions): ProviderContract {
-    const orderBookMergerService = OrderBookMergerService.create();
-    let provider: ProviderContract;
-
-    if (options.providerId === "binance") {
-      provider = BinanceService.create({
-        symbols: options.symbols,
-        clockService: options.clockService,
-        webSocketFactory: options.webSocketFactory,
-        providerOptions: DEFAULT_PROVIDER_OPTIONS,
-      });
-    } else if (options.providerId === "coinbase") {
-      provider = CoinbaseService.create({
-        symbols: options.symbols,
-        maxLevels: DEFAULT_ORDER_BOOK_LEVELS,
-        clockService: options.clockService,
-        webSocketFactory: options.webSocketFactory,
-        providerOptions: DEFAULT_PROVIDER_OPTIONS,
-        orderBookMergerService,
-      });
-    } else if (options.providerId === "kraken") {
-      provider = KrakenService.create({
-        symbols: options.symbols,
-        maxLevels: DEFAULT_ORDER_BOOK_LEVELS,
-        clockService: options.clockService,
-        webSocketFactory: options.webSocketFactory,
-        providerOptions: DEFAULT_PROVIDER_OPTIONS,
-        orderBookMergerService,
-      });
-    } else if (options.providerId === "okx") {
-      provider = OkxService.create({
-        symbols: options.symbols,
-        maxLevels: DEFAULT_ORDER_BOOK_LEVELS,
-        clockService: options.clockService,
-        webSocketFactory: options.webSocketFactory,
-        providerOptions: DEFAULT_PROVIDER_OPTIONS,
-      });
-    } else {
-      provider = ChainlinkService.create({
-        symbols: options.symbols,
-        clockService: options.clockService,
-        webSocketFactory: options.webSocketFactory,
-        providerOptions: DEFAULT_PROVIDER_OPTIONS,
-      });
-    }
-
-    return provider;
-  }
-
-  private static createProviders(options: CreateProvidersOptions): ProviderContract[] {
-    const rawSymbols = options.clientOptions?.symbols ?? DEFAULT_SYMBOLS;
-    const normalizedSymbols = options.symbolNormalizerService.normalizeSymbols(rawSymbols);
-    const providerIds = options.clientOptions?.providers ?? DEFAULT_PROVIDERS;
-    const providers: ProviderContract[] = [];
-    const webSocketFactory: WebSocketFactory = (connectionUrl) => {
-      const socket = new WebSocket(connectionUrl);
-      return socket;
-    };
-
-    for (const providerId of providerIds) {
-      const provider = CryptoFeedClient.createProvider({
-        providerId,
-        symbols: normalizedSymbols,
-        clockService: options.clockService,
-        webSocketFactory,
-      });
-      providers.push(provider);
-    }
-
-    return providers;
-  }
 
   private notifyListeners(event: FeedEvent): void {
     for (const listener of this.listeners) {
@@ -208,7 +186,7 @@ export class CryptoFeedClient {
     const isHistoryEvent = event.type !== "status";
 
     if (isHistoryEvent) {
-      this.historyService.append(event, this.clockService.now());
+      this.historyStoreService.append(event, this.clockService.now());
     }
 
     this.notifyListeners(event);
@@ -269,7 +247,7 @@ export class CryptoFeedClient {
   public subscribe(listener: FeedEventListener): Subscription {
     this.listeners.add(listener);
     const subscription: Subscription = {
-      unsubscribe: () => {
+      unsubscribe: (): void => {
         this.listeners.delete(listener);
       },
     };
@@ -316,17 +294,12 @@ export class CryptoFeedClient {
    */
 
   public static fromProviders(providers: ProviderContract[], retentionOverrides?: Partial<RetentionOptions>): CryptoFeedClient {
-    const symbolNormalizerService = SymbolNormalizerService.create();
+    const symbolService = SymbolService.create();
     const clockService = ClockService.createSystemClock();
-    const retentionConfig = CryptoFeedClient.toRetentionConfig(retentionOverrides);
-    const historyService = InMemoryHistoryService.create(retentionConfig);
-    const historyQueryService = HistoryQueryService.create(historyService, symbolNormalizerService);
-    const client = new CryptoFeedClient({
-      providers,
-      historyService,
-      historyQueryService,
-      clockService,
-    });
+    const retentionConfig = toRetentionConfig(retentionOverrides);
+    const historyStoreService = HistoryStoreService.create(retentionConfig);
+    const historyQueryService = HistoryQueryService.create(historyStoreService, symbolService);
+    const client = new CryptoFeedClient({ providers, historyStoreService, historyQueryService, clockService });
     return client;
   }
 }

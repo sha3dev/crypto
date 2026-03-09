@@ -1,6 +1,7 @@
 {
   "files": {
-    "ignoreUnknown": true
+    "ignoreUnknown": true,
+    "ignore": [".code-standards"]
   },
   "formatter": {
     "enabled": true,

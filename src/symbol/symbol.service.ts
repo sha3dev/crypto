@@ -4,17 +4,13 @@
 
 const EMPTY_SYMBOL = "";
 
-/**
- * @section types
- */
-
-export class SymbolNormalizerService {
+export class SymbolService {
   /**
    * @section factory
    */
 
-  public static create(): SymbolNormalizerService {
-    const service = new SymbolNormalizerService();
+  public static create(): SymbolService {
+    const service = new SymbolService();
     return service;
   }
 

@@ -1,4 +1,5 @@
-export { CryptoFeedClient } from "./client/crypto-feed-client.service.ts";
+export { CryptoFeedClient } from "./client/client.service.ts";
+export { NoProvidersConnectedError } from "./client/client.errors.ts";
 export type {
   ClientOptions,
   FeedEventListener,
@@ -6,7 +7,6 @@ export type {
   RetentionOptions,
   Subscription,
 } from "./client/client.types.ts";
-export { NoProvidersConnectedError } from "./client/no-providers-connected.errors.ts";
 export type {
   CryptoProviderId,
   CryptoSymbol,
@@ -16,7 +16,4 @@ export type {
   PricePoint,
   ProviderStatusEvent,
   TradePoint,
-} from "./providers/shared/provider.types.ts";
-export { ProviderConnectionError } from "./providers/shared/provider-connection.errors.ts";
-export { ProviderParseError } from "./providers/shared/provider-parse.errors.ts";
-export { InvalidHistoryQueryError } from "./history/invalid-history-query.errors.ts";
+} from "./provider/provider.types.ts";

@@ -2,13 +2,13 @@
  * @section imports:internals
  */
 
-import type { OrderBookLevel } from "../providers/shared/provider.types.ts";
+import type { OrderBookLevel } from "../provider/provider.types.ts";
 
 /**
  * @section types
  */
 
-type MergeOrderBookOptions = {
+type MergeBookOptions = {
   currentAsks: OrderBookLevel[];
   currentBids: OrderBookLevel[];
   deltaAsks: OrderBookLevel[];
@@ -16,18 +16,18 @@ type MergeOrderBookOptions = {
   maxLevels: number;
 };
 
-type MergeOrderBookResult = {
+type MergeBookResult = {
   asks: OrderBookLevel[];
   bids: OrderBookLevel[];
 };
 
-export class OrderBookMergerService {
+export class OrderBookService {
   /**
    * @section factory
    */
 
-  public static create(): OrderBookMergerService {
-    const service = new OrderBookMergerService();
+  public static create(): OrderBookService {
+    const service = new OrderBookService();
     return service;
   }
 
@@ -80,10 +80,10 @@ export class OrderBookMergerService {
    * @section public:methods
    */
 
-  public merge(options: MergeOrderBookOptions): MergeOrderBookResult {
+  public merge(options: MergeBookOptions): MergeBookResult {
     const asks = this.mergeSide(options.currentAsks, options.deltaAsks, false, options.maxLevels);
     const bids = this.mergeSide(options.currentBids, options.deltaBids, true, options.maxLevels);
-    const mergeResult: MergeOrderBookResult = { asks, bids };
+    const mergeResult: MergeBookResult = { asks, bids };
     return mergeResult;
   }
 }

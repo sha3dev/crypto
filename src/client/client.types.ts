@@ -1,4 +1,4 @@
-import type { CryptoProviderId, CryptoSymbol, FeedEvent, OrderBookSnapshot, PricePoint, TradePoint } from "../providers/shared/provider.types.ts";
+import type { CryptoProviderId, CryptoSymbol, FeedEvent, OrderBookSnapshot, PricePoint, TradePoint } from "../provider/provider.types.ts";
 
 export type HistoryQuery = {
   symbol: CryptoSymbol;
@@ -25,9 +25,8 @@ export type Subscription = {
   unsubscribe(): void;
 };
 
-export type CryptoClientPublicTypes = {
-  FeedEvent: FeedEvent;
-  PricePoint: PricePoint;
-  OrderBookSnapshot: OrderBookSnapshot;
-  TradePoint: TradePoint;
+export type ClientQueryResult = {
+  latestPrice: PricePoint | null;
+  latestOrderBook: OrderBookSnapshot | null;
+  latestTrade: TradePoint | null;
 };

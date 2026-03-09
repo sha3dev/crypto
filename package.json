@@ -11,7 +11,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "engines": {
     "node": ">=20"
   },
@@ -31,24 +33,24 @@
   },
   "dependencies": {
     "@sha3/logger": "^2.0.0",
-    "ws": "^8.18.3"
+    "ws": "^8.19.0"
   },
   "devDependencies": {
-    "@sha3/code-standards": "^0.15.0",
-    "@types/node": "^22.13.10",
+    "@sha3/code-standards": "^0.29.0",
+    "@types/node": "^25.3.5",
     "@types/ws": "^8.18.1",
-    "eslint": "^9.20.1",
-    "prettier": "^3.5.3",
-    "tsx": "^4.19.3",
-    "typescript": "^5.8.2",
-    "typescript-eslint": "^8.46.3",
-    "@biomejs/biome": "^1.9.4"
+    "eslint": "^10.0.3",
+    "prettier": "^3.8.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.57.0",
+    "@biomejs/biome": "^2.4.6"
   },
   "codeStandards": {
     "template": "node-lib",
     "profilePath": null,
     "withAiAdapters": true,
-    "lastRefactorWith": "0.15.0",
+    "lastRefactorWith": "0.29.0",
     "contractVersion": "v1"
   },
   "repository": {

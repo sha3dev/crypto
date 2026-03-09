@@ -1,6 +1,6 @@
 {
   "formatVersion": "v1",
-  "generatedByVersion": "0.15.0",
+  "generatedByVersion": "0.29.0",
   "project": {
     "name": "crypto",
     "template": "node-lib",
@@ -73,8 +73,11 @@
     "ai/examples/rules/returns-good.ts",
     "ai/examples/rules/testing-bad.ts",
     "ai/examples/rules/testing-good.ts",
+    "ai/rules.md",
     "ai/windsurf.md",
+    "prompts/init-contract.md",
     "prompts/init.prompt.md",
+    "prompts/refactor-contract.md",
     "prompts/refactor.prompt.md"
   ],
   "rules": [
@@ -85,11 +88,27 @@
       "severity": "blocking-deterministic",
       "kind": "style",
       "deterministic": true,
-      "appliesTo": ["src/**/*.ts"],
-      "enforcedBy": ["verify"],
+      "verificationMode": "deterministic",
+      "verificationSource": "ast",
+      "blocking": true,
+      "implementedBy": [
+        "source-rule-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
       "examples": {
-        "good": ["ai/examples/rules/returns-good.ts"],
-        "bad": ["ai/examples/rules/returns-bad.ts"]
+        "good": [
+          "ai/examples/rules/returns-good.ts"
+        ],
+        "bad": [
+          "ai/examples/rules/returns-bad.ts"
+        ]
       }
     },
     {
@@ -99,11 +118,27 @@
       "severity": "blocking-deterministic",
       "kind": "style",
       "deterministic": true,
-      "appliesTo": ["src/**/*.ts"],
-      "enforcedBy": ["verify"],
+      "verificationMode": "deterministic",
+      "verificationSource": "ast",
+      "blocking": true,
+      "implementedBy": [
+        "source-rule-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
       "examples": {
-        "good": ["ai/examples/rules/async-good.ts"],
-        "bad": ["ai/examples/rules/async-bad.ts"]
+        "good": [
+          "ai/examples/rules/async-good.ts"
+        ],
+        "bad": [
+          "ai/examples/rules/async-bad.ts"
+        ]
       }
     },
     {
@@ -113,11 +148,57 @@
       "severity": "blocking-deterministic",
       "kind": "architecture",
       "deterministic": true,
-      "appliesTo": ["src/**/*.ts"],
-      "enforcedBy": ["verify"],
+      "verificationMode": "deterministic",
+      "verificationSource": "ast",
+      "blocking": true,
+      "implementedBy": [
+        "source-rule-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
       "examples": {
-        "good": ["ai/examples/rules/class-first-good.ts"],
-        "bad": ["ai/examples/rules/class-first-bad.ts"]
+        "good": [
+          "ai/examples/rules/class-first-good.ts"
+        ],
+        "bad": [
+          "ai/examples/rules/class-first-bad.ts"
+        ]
+      }
+    },
+    {
+      "id": "feature-class-only",
+      "title": "Feature Files Are Class Files",
+      "summary": "Files inside src/<feature>/ must expose exactly one public class, except .types.ts files.",
+      "severity": "blocking-deterministic",
+      "kind": "architecture",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "ast",
+      "blocking": true,
+      "implementedBy": [
+        "source-rule-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/*/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [
+          "ai/examples/demo/src/invoice/invoice.service.ts"
+        ],
+        "bad": [
+          "ai/examples/rules/class-first-bad.ts"
+        ]
       }
     },
     {
@@ -127,11 +208,29 @@
       "severity": "blocking-deterministic",
       "kind": "style",
       "deterministic": true,
-      "appliesTo": ["src/**/*.ts"],
-      "enforcedBy": ["verify"],
+      "verificationMode": "deterministic",
+      "verificationSource": "text",
+      "blocking": true,
+      "implementedBy": [
+        "source-rule-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
       "examples": {
-        "good": ["ai/examples/rules/class-first-good.ts", "ai/examples/rules/constructor-good.ts"],
-        "bad": ["ai/examples/rules/class-first-bad.ts", "ai/examples/rules/constructor-bad.ts"]
+        "good": [
+          "ai/examples/rules/class-first-good.ts",
+          "ai/examples/rules/constructor-good.ts"
+        ],
+        "bad": [
+          "ai/examples/rules/class-first-bad.ts",
+          "ai/examples/rules/constructor-bad.ts"
+        ]
       }
     },
     {
@@ -141,10 +240,25 @@
       "severity": "blocking-deterministic",
       "kind": "architecture",
       "deterministic": true,
-      "appliesTo": ["src/**/*.ts"],
-      "enforcedBy": ["verify"],
+      "verificationMode": "deterministic",
+      "verificationSource": "ast",
+      "blocking": true,
+      "implementedBy": [
+        "source-rule-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
       "examples": {
-        "good": ["ai/examples/demo/src/billing/billing.service.ts", "ai/examples/demo/src/invoice/invoice.service.ts"],
+        "good": [
+          "ai/examples/demo/src/billing/billing.service.ts",
+          "ai/examples/demo/src/invoice/invoice.service.ts"
+        ],
         "bad": []
       }
     },
@@ -155,11 +269,28 @@
       "severity": "blocking-deterministic",
       "kind": "style",
       "deterministic": true,
-      "appliesTo": ["src/**/*.ts", "test/**/*.ts"],
-      "enforcedBy": ["verify"],
+      "verificationMode": "deterministic",
+      "verificationSource": "ast",
+      "blocking": true,
+      "implementedBy": [
+        "source-rule-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
       "examples": {
-        "good": ["ai/examples/rules/functions-good.ts"],
-        "bad": ["ai/examples/rules/functions-bad.ts"]
+        "good": [
+          "ai/examples/rules/functions-good.ts"
+        ],
+        "bad": [
+          "ai/examples/rules/functions-bad.ts"
+        ]
       }
     },
     {
@@ -169,11 +300,28 @@
       "severity": "blocking-deterministic",
       "kind": "style",
       "deterministic": true,
-      "appliesTo": ["src/**/*.ts", "test/**/*.ts"],
-      "enforcedBy": ["verify"],
+      "verificationMode": "deterministic",
+      "verificationSource": "ast",
+      "blocking": true,
+      "implementedBy": [
+        "source-rule-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
       "examples": {
-        "good": ["ai/examples/rules/functions-good.ts"],
-        "bad": ["ai/examples/rules/functions-bad.ts"]
+        "good": [
+          "ai/examples/rules/functions-good.ts"
+        ],
+        "bad": [
+          "ai/examples/rules/functions-bad.ts"
+        ]
       }
     },
     {
@@ -183,11 +331,29 @@
       "severity": "blocking-deterministic",
       "kind": "architecture",
       "deterministic": true,
-      "appliesTo": ["src/**/*.ts"],
-      "enforcedBy": ["verify"],
+      "verificationMode": "deterministic",
+      "verificationSource": "filesystem",
+      "blocking": true,
+      "implementedBy": [
+        "source-rule-verifier",
+        "project-layout-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
       "examples": {
-        "good": ["ai/examples/demo/src/invoice/invoice.service.ts", "ai/examples/demo/src/invoice/invoice.types.ts"],
-        "bad": ["ai/examples/rules/class-first-bad.ts"]
+        "good": [
+          "ai/examples/demo/src/invoice/invoice.service.ts",
+          "ai/examples/demo/src/invoice/invoice.types.ts"
+        ],
+        "bad": [
+          "ai/examples/rules/class-first-bad.ts"
+        ]
       }
     },
     {
@@ -197,11 +363,631 @@
       "severity": "blocking-deterministic",
       "kind": "style",
       "deterministic": true,
-      "appliesTo": ["src/**/*", "test/**/*"],
-      "enforcedBy": ["verify", "biome"],
+      "verificationMode": "deterministic",
+      "verificationSource": "filesystem",
+      "blocking": true,
+      "implementedBy": [
+        "project-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*",
+        "test/**/*"
+      ],
+      "enforcedBy": [
+        "verify",
+        "biome"
+      ],
       "examples": {
-        "good": ["ai/examples/rules/functions-good.ts"],
+        "good": [
+          "ai/examples/rules/functions-good.ts"
+        ],
         "bad": []
+      }
+    },
+    {
+      "id": "kebab-case-paths",
+      "title": "Kebab Case Paths",
+      "summary": "Source and test paths must use kebab-case names for files and directories unless explicitly reserved.",
+      "severity": "blocking-deterministic",
+      "kind": "style",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "filesystem",
+      "blocking": true,
+      "implementedBy": [
+        "project-layout-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*",
+        "test/**/*"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "singular-feature-folders",
+      "title": "Singular Feature Folders",
+      "summary": "Feature folder names under src/ must be singular unless they are reserved structural folders.",
+      "severity": "blocking-deterministic",
+      "kind": "architecture",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "filesystem",
+      "blocking": true,
+      "implementedBy": [
+        "project-layout-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/*"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "test-file-naming",
+      "title": "Test File Naming",
+      "summary": "Tests must live under test/ and use the .test.ts suffix.",
+      "severity": "blocking-deterministic",
+      "kind": "testing",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "filesystem",
+      "blocking": true,
+      "implementedBy": [
+        "project-layout-verifier",
+        "testing-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "test/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "module-constant-case",
+      "title": "Module Constant Case",
+      "summary": "Module-level constants must use SCREAMING_SNAKE_CASE except for the canonical config export.",
+      "severity": "blocking-deterministic",
+      "kind": "style",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "ast",
+      "blocking": true,
+      "implementedBy": [
+        "typescript-style-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "local-constant-case",
+      "title": "Local Constant Case",
+      "summary": "Local constants must use camelCase names.",
+      "severity": "blocking-deterministic",
+      "kind": "style",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "ast",
+      "blocking": true,
+      "implementedBy": [
+        "typescript-style-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "config-default-export-name",
+      "title": "Config Default Export Name",
+      "summary": "src/config.ts must export a default object named config.",
+      "severity": "blocking-deterministic",
+      "kind": "architecture",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "ast",
+      "blocking": true,
+      "implementedBy": [
+        "typescript-style-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/config.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [
+          "ai/examples/demo/src/config.ts"
+        ],
+        "bad": []
+      }
+    },
+    {
+      "id": "no-any",
+      "title": "No Any",
+      "summary": "Explicit any is forbidden in source and tests.",
+      "severity": "blocking-deterministic",
+      "kind": "style",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "ast",
+      "blocking": true,
+      "implementedBy": [
+        "typescript-style-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "explicit-export-return-types",
+      "title": "Explicit Export Return Types",
+      "summary": "Exported functions and public methods of exported classes must declare explicit return types.",
+      "severity": "blocking-deterministic",
+      "kind": "style",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "ast",
+      "blocking": true,
+      "implementedBy": [
+        "typescript-style-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "type-only-imports",
+      "title": "Type-only Imports",
+      "summary": "Imports used only in type positions must use import type.",
+      "severity": "blocking-deterministic",
+      "kind": "style",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "combined",
+      "blocking": true,
+      "implementedBy": [
+        "typescript-style-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "prefer-types-over-interfaces",
+      "title": "Prefer Types Over Interfaces",
+      "summary": "Interfaces are forbidden for local modeling unless they are part of the public contract exported from src/index.ts.",
+      "severity": "blocking-deterministic",
+      "kind": "style",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "combined",
+      "blocking": true,
+      "implementedBy": [
+        "typescript-style-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "control-flow-braces",
+      "title": "Control Flow Braces",
+      "summary": "if, else, for, while, and do blocks must always use braces.",
+      "severity": "blocking-deterministic",
+      "kind": "style",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "ast",
+      "blocking": true,
+      "implementedBy": [
+        "typescript-style-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [
+          "ai/examples/rules/control-flow-good.ts"
+        ],
+        "bad": [
+          "ai/examples/rules/control-flow-bad.ts"
+        ]
+      }
+    },
+    {
+      "id": "concise-simple-callbacks",
+      "title": "Concise Simple Callbacks",
+      "summary": "Simple callbacks must use concise arrow expressions instead of block bodies with an explicit return.",
+      "severity": "blocking-deterministic",
+      "kind": "style",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "ast",
+      "blocking": true,
+      "implementedBy": [
+        "typescript-style-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "compact-single-line-constructs",
+      "title": "Compact Single Line Constructs",
+      "summary": "Declarations, calls, imports, arrays, and objects that fit on one line should not be spread across multiple lines.",
+      "severity": "guidance",
+      "kind": "style",
+      "deterministic": false,
+      "verificationMode": "heuristic",
+      "verificationSource": "combined",
+      "blocking": true,
+      "implementedBy": [
+        "typescript-style-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "feature-first-layout",
+      "title": "Feature First Layout",
+      "summary": "Projects with feature modules must keep domain code under feature folders instead of mixing flat modules at src/ root.",
+      "severity": "guidance",
+      "kind": "architecture",
+      "deterministic": false,
+      "verificationMode": "heuristic",
+      "verificationSource": "filesystem",
+      "blocking": true,
+      "implementedBy": [
+        "project-layout-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "medium",
+      "appliesTo": [
+        "src/**/*"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "restricted-shared-boundaries",
+      "title": "Restricted Shared Boundaries",
+      "summary": "src/app and src/shared should exist only when real composition or cross-feature sharing justifies them.",
+      "severity": "guidance",
+      "kind": "architecture",
+      "deterministic": false,
+      "verificationMode": "heuristic",
+      "verificationSource": "combined",
+      "blocking": true,
+      "implementedBy": [
+        "project-layout-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "medium",
+      "appliesTo": [
+        "src/app/**",
+        "src/shared/**"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "cross-feature-entrypoint-imports",
+      "title": "Cross Feature Entrypoint Imports",
+      "summary": "Cross-feature imports must go through an explicit feature entrypoint rather than another feature's internal file.",
+      "severity": "blocking-deterministic",
+      "kind": "architecture",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "combined",
+      "blocking": true,
+      "implementedBy": [
+        "project-layout-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "types-file-justification",
+      "title": "Types File Justification",
+      "summary": "Dedicated .types.ts files should only exist when they contain substantial shared feature types.",
+      "severity": "guidance",
+      "kind": "architecture",
+      "deterministic": false,
+      "verificationMode": "heuristic",
+      "verificationSource": "combined",
+      "blocking": true,
+      "implementedBy": [
+        "project-layout-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "medium",
+      "appliesTo": [
+        "src/**/*.types.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "ambiguous-feature-filenames",
+      "title": "Ambiguous Feature Filenames",
+      "summary": "Feature code must not use ambiguous file names such as helpers.ts, utils.ts, or common.ts.",
+      "severity": "blocking-deterministic",
+      "kind": "architecture",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "filesystem",
+      "blocking": true,
+      "implementedBy": [
+        "project-layout-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "plain-error-default",
+      "title": "Plain Error Default",
+      "summary": "Plain Error must be used by default; custom error types require a real control-flow consumer.",
+      "severity": "guidance",
+      "kind": "workflow",
+      "deterministic": false,
+      "verificationMode": "heuristic",
+      "verificationSource": "combined",
+      "blocking": true,
+      "implementedBy": [
+        "error-handling-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "medium",
+      "appliesTo": [
+        "src/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [
+          "ai/examples/rules/errors-good.ts"
+        ],
+        "bad": [
+          "ai/examples/rules/errors-bad.ts"
+        ]
+      }
+    },
+    {
+      "id": "typed-error-must-be-used",
+      "title": "Typed Error Must Be Used",
+      "summary": "Custom error types must be consumed by logic that distinguishes them from plain failures.",
+      "severity": "blocking-deterministic",
+      "kind": "workflow",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "combined",
+      "blocking": true,
+      "implementedBy": [
+        "error-handling-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [
+          "ai/examples/rules/errors-good.ts"
+        ],
+        "bad": [
+          "ai/examples/rules/errors-bad.ts"
+        ]
+      }
+    },
+    {
+      "id": "no-silent-catch",
+      "title": "No Silent Catch",
+      "summary": "Catch blocks must rethrow, transform, or report errors instead of silently swallowing them.",
+      "severity": "blocking-deterministic",
+      "kind": "workflow",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "ast",
+      "blocking": true,
+      "implementedBy": [
+        "error-handling-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [
+          "ai/examples/rules/errors-good.ts"
+        ],
+        "bad": [
+          "ai/examples/rules/errors-bad.ts"
+        ]
+      }
+    },
+    {
+      "id": "actionable-error-messages",
+      "title": "Actionable Error Messages",
+      "summary": "Error messages should include actionable context rather than empty or generic text.",
+      "severity": "guidance",
+      "kind": "workflow",
+      "deterministic": false,
+      "verificationMode": "heuristic",
+      "verificationSource": "ast",
+      "blocking": true,
+      "implementedBy": [
+        "error-handling-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "medium",
+      "appliesTo": [
+        "src/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [
+          "ai/examples/rules/errors-good.ts"
+        ],
+        "bad": [
+          "ai/examples/rules/errors-bad.ts"
+        ]
       }
     },
     {
@@ -211,8 +997,23 @@
       "severity": "guidance",
       "kind": "workflow",
       "deterministic": false,
-      "appliesTo": ["AGENTS.md", "ai/*.md", "ai/contract.json", "tooling config files"],
-      "enforcedBy": ["AGENTS"],
+      "verificationMode": "audit",
+      "verificationSource": "git-diff",
+      "blocking": true,
+      "implementedBy": [
+        "change-audit-verifier"
+      ],
+      "requiresContext": "changed-files",
+      "confidence": "medium",
+      "appliesTo": [
+        "AGENTS.md",
+        "ai/*.md",
+        "ai/contract.json",
+        "tooling config files"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
       "examples": {
         "good": [],
         "bad": []
@@ -225,11 +1026,133 @@
       "severity": "guidance",
       "kind": "testing",
       "deterministic": false,
-      "appliesTo": ["src/**/*.ts", "test/**/*.ts"],
-      "enforcedBy": ["AGENTS", "human-review"],
+      "verificationMode": "audit",
+      "verificationSource": "git-diff",
+      "blocking": true,
+      "implementedBy": [
+        "testing-verifier"
+      ],
+      "requiresContext": "changed-files",
+      "confidence": "medium",
+      "appliesTo": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
       "examples": {
-        "good": ["ai/examples/rules/testing-good.ts"],
-        "bad": ["ai/examples/rules/testing-bad.ts"]
+        "good": [
+          "ai/examples/rules/testing-good.ts"
+        ],
+        "bad": [
+          "ai/examples/rules/testing-bad.ts"
+        ]
+      }
+    },
+    {
+      "id": "node-test-runner-only",
+      "title": "Node Test Runner Only",
+      "summary": "Test files must use node:test instead of alternative runners.",
+      "severity": "blocking-deterministic",
+      "kind": "testing",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "ast",
+      "blocking": true,
+      "implementedBy": [
+        "testing-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "test/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "assert-strict-preferred",
+      "title": "Assert Strict Preferred",
+      "summary": "Tests must use node:assert/strict for assertions.",
+      "severity": "blocking-deterministic",
+      "kind": "testing",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "ast",
+      "blocking": true,
+      "implementedBy": [
+        "testing-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "test/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "no-ts-ignore-bypass",
+      "title": "No TS Ignore Bypass",
+      "summary": "TypeScript and Biome ignore directives must not be used to bypass real issues in source or tests.",
+      "severity": "blocking-deterministic",
+      "kind": "testing",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "text",
+      "blocking": true,
+      "implementedBy": [
+        "testing-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "test-determinism-guards",
+      "title": "Test Determinism Guards",
+      "summary": "Tests should avoid uncontrolled time, randomness, real network calls, and un-restored process.env mutation.",
+      "severity": "guidance",
+      "kind": "testing",
+      "deterministic": false,
+      "verificationMode": "heuristic",
+      "verificationSource": "combined",
+      "blocking": true,
+      "implementedBy": [
+        "testing-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "medium",
+      "appliesTo": [
+        "test/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
       }
     },
     {
@@ -239,8 +1162,283 @@
       "severity": "blocking-deterministic",
       "kind": "documentation",
       "deterministic": true,
-      "appliesTo": ["README.md"],
-      "enforcedBy": ["verify"],
+      "verificationMode": "deterministic",
+      "verificationSource": "readme",
+      "blocking": true,
+      "implementedBy": [
+        "readme-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "README.md"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "readme-no-placeholder-language",
+      "title": "README No Placeholder Language",
+      "summary": "README content must not look like a scaffold placeholder or contain TODO-style filler text.",
+      "severity": "guidance",
+      "kind": "documentation",
+      "deterministic": false,
+      "verificationMode": "heuristic",
+      "verificationSource": "readme",
+      "blocking": true,
+      "implementedBy": [
+        "readme-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "medium",
+      "appliesTo": [
+        "README.md"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "readme-config-coverage",
+      "title": "README Config Coverage",
+      "summary": "README must document each top-level configuration key exposed from src/config.ts.",
+      "severity": "blocking-deterministic",
+      "kind": "documentation",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "combined",
+      "blocking": true,
+      "implementedBy": [
+        "readme-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "README.md",
+        "src/config.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "readme-runnable-examples",
+      "title": "README Runnable Examples",
+      "summary": "README must include plausible runnable code or command examples instead of abstract placeholders.",
+      "severity": "guidance",
+      "kind": "documentation",
+      "deterministic": false,
+      "verificationMode": "heuristic",
+      "verificationSource": "readme",
+      "blocking": true,
+      "implementedBy": [
+        "readme-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "medium",
+      "appliesTo": [
+        "README.md"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "required-scripts",
+      "title": "Required Scripts",
+      "summary": "Generated projects must expose the required standards, lint, format, typecheck, test, and check scripts.",
+      "severity": "blocking-deterministic",
+      "kind": "workflow",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "package-json",
+      "blocking": true,
+      "implementedBy": [
+        "tooling-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "package.json"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "standards-check-script",
+      "title": "Standards Check Script",
+      "summary": "npm run standards:check must execute code-standards verify.",
+      "severity": "blocking-deterministic",
+      "kind": "workflow",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "package-json",
+      "blocking": true,
+      "implementedBy": [
+        "tooling-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "package.json"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "package-exports-alignment",
+      "title": "Package Exports Alignment",
+      "summary": "Generated projects must stay aligned with @sha3/code-standards biome and tsconfig exports.",
+      "severity": "blocking-deterministic",
+      "kind": "workflow",
+      "deterministic": true,
+      "verificationMode": "deterministic",
+      "verificationSource": "combined",
+      "blocking": true,
+      "implementedBy": [
+        "tooling-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "high",
+      "appliesTo": [
+        "package.json",
+        "biome.json",
+        "tsconfig.json"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "simplicity-audit",
+      "title": "Simplicity Audit",
+      "summary": "Projects should avoid needless layers, wrappers, and extra files when a smaller direct implementation would suffice.",
+      "severity": "guidance",
+      "kind": "architecture",
+      "deterministic": false,
+      "verificationMode": "audit",
+      "verificationSource": "combined",
+      "blocking": true,
+      "implementedBy": [
+        "change-audit-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "medium",
+      "appliesTo": [
+        "src/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "no-speculative-abstractions",
+      "title": "No Speculative Abstractions",
+      "summary": "Factories, options types, wrappers, and helper layers should not exist without a real current consumer or complexity reduction.",
+      "severity": "guidance",
+      "kind": "architecture",
+      "deterministic": false,
+      "verificationMode": "heuristic",
+      "verificationSource": "combined",
+      "blocking": true,
+      "implementedBy": [
+        "change-audit-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "medium",
+      "appliesTo": [
+        "src/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "single-responsibility-heuristic",
+      "title": "Single Responsibility Heuristic",
+      "summary": "Long functions and methods should be split when they appear to mix multiple responsibilities.",
+      "severity": "guidance",
+      "kind": "style",
+      "deterministic": false,
+      "verificationMode": "heuristic",
+      "verificationSource": "ast",
+      "blocking": true,
+      "implementedBy": [
+        "change-audit-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "medium",
+      "appliesTo": [
+        "src/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
+      "examples": {
+        "good": [],
+        "bad": []
+      }
+    },
+    {
+      "id": "comments-policy-audit",
+      "title": "Comments Policy Audit",
+      "summary": "Non-trivial logic should include explicit comments when the profile requires extensive comments.",
+      "severity": "guidance",
+      "kind": "style",
+      "deterministic": false,
+      "verificationMode": "audit",
+      "verificationSource": "combined",
+      "blocking": true,
+      "implementedBy": [
+        "change-audit-verifier"
+      ],
+      "requiresContext": "full-project",
+      "confidence": "medium",
+      "appliesTo": [
+        "src/**/*.ts"
+      ],
+      "enforcedBy": [
+        "verify"
+      ],
       "examples": {
         "good": [],
         "bad": []

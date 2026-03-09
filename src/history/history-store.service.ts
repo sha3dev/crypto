@@ -2,7 +2,7 @@
  * @section imports:internals
  */
 
-import type { CryptoProviderId, CryptoSymbol, PricePoint } from "../providers/shared/provider.types.ts";
+import type { CryptoProviderId, CryptoSymbol, PricePoint } from "../provider/provider.types.ts";
 import type { HistoryDataPoint, HistoryEventType, HistoryRangeQuery, HistoryRetentionConfig } from "./history.types.ts";
 
 /**
@@ -20,7 +20,7 @@ type ClosestPriceCandidate = {
   point: PricePoint;
 };
 
-export class InMemoryHistoryService {
+export class HistoryStoreService {
   /**
    * @section private:attributes
    */
@@ -46,8 +46,8 @@ export class InMemoryHistoryService {
    * @section factory
    */
 
-  public static create(retentionConfig: HistoryRetentionConfig): InMemoryHistoryService {
-    const service = new InMemoryHistoryService(retentionConfig);
+  public static create(retentionConfig: HistoryRetentionConfig): HistoryStoreService {
+    const service = new HistoryStoreService(retentionConfig);
     return service;
   }
 
@@ -90,7 +90,7 @@ export class InMemoryHistoryService {
     const storedSeries = this.pointsByStream.get(streamKey);
     let historySeries = EMPTY_HISTORY_SERIES;
 
-    if (storedSeries) {
+    if (storedSeries !== undefined) {
       historySeries = storedSeries;
     }
 
@@ -158,7 +158,7 @@ export class InMemoryHistoryService {
   public getLatest(eventType: HistoryEventType, symbol: CryptoSymbol, provider?: CryptoProviderId): HistoryDataPoint | null {
     let latestPoint: HistoryDataPoint | null = null;
 
-    if (provider) {
+    if (provider !== undefined) {
       const providerSeries = this.getSeries(eventType, symbol, provider);
       latestPoint = providerSeries[0] ?? null;
     } else {
@@ -181,7 +181,7 @@ export class InMemoryHistoryService {
   public getRange(query: HistoryRangeQuery): HistoryDataPoint[] {
     const historySeriesGroups: HistoryDataPoint[][] = [];
 
-    if (query.provider) {
+    if (query.provider !== undefined) {
       const providerSeries = this.getSeries(query.eventType, query.symbol, query.provider);
       historySeriesGroups.push(this.toAscending(providerSeries));
     } else {
@@ -208,21 +208,10 @@ export class InMemoryHistoryService {
   }
 
   public getClosestPrice(symbol: CryptoSymbol, targetTs: number, provider?: CryptoProviderId): PricePoint | null {
-    const rangeQuery =
+    const rangeQuery: HistoryRangeQuery =
       provider === undefined
-        ? {
-            eventType: "price" as const,
-            symbol,
-            fromTs: Number.MIN_SAFE_INTEGER,
-            toTs: Number.MAX_SAFE_INTEGER,
-          }
-        : {
-            eventType: "price" as const,
-            symbol,
-            fromTs: Number.MIN_SAFE_INTEGER,
-            toTs: Number.MAX_SAFE_INTEGER,
-            provider,
-          };
+        ? { eventType: "price", symbol, fromTs: Number.MIN_SAFE_INTEGER, toTs: Number.MAX_SAFE_INTEGER }
+        : { eventType: "price", symbol, fromTs: Number.MIN_SAFE_INTEGER, toTs: Number.MAX_SAFE_INTEGER, provider };
     const pricePoints = this.getRange(rangeQuery);
     let closestCandidate: ClosestPriceCandidate | null = null;
 
@@ -237,7 +226,7 @@ export class InMemoryHistoryService {
       }
     }
 
-    const closestPoint = closestCandidate ? closestCandidate.point : null;
+    const closestPoint = closestCandidate === null ? null : closestCandidate.point;
     return closestPoint;
   }
 }

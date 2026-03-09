@@ -1,4 +1,4 @@
-import type { CryptoProviderId, CryptoSymbol, OrderBookSnapshot, PricePoint, TradePoint } from "../providers/shared/provider.types.ts";
+import type { CryptoProviderId, CryptoSymbol, OrderBookSnapshot, PricePoint, TradePoint } from "../provider/provider.types.ts";
 
 export type HistoryEventType = "price" | "orderbook" | "trade";
 

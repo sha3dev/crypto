@@ -1,22 +1,24 @@
 import * as assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { InMemoryHistoryService } from "../../src/history/in-memory-history.service.ts";
+import { HistoryQueryService } from "../../src/history/history-query.service.ts";
+import { HistoryStoreService } from "../../src/history/history-store.service.ts";
+import { SymbolService } from "../../src/symbol/symbol.service.ts";
 
 test("history service prunes by window and size and returns inclusive range", () => {
-  const historyService = InMemoryHistoryService.create({
+  const historyStoreService = HistoryStoreService.create({
     windowMs: 1000,
     maxSamplesPerStream: 3,
     maxTradesPerStream: 3,
   });
 
-  historyService.append({ type: "price", provider: "binance", symbol: "btc", ts: 1_000, price: 100 }, 1_100);
-  historyService.append({ type: "price", provider: "binance", symbol: "btc", ts: 1_200, price: 101 }, 1_200);
-  historyService.append({ type: "price", provider: "binance", symbol: "btc", ts: 1_300, price: 102 }, 1_300);
-  historyService.append({ type: "price", provider: "binance", symbol: "btc", ts: 1_400, price: 103 }, 1_400);
-  historyService.append({ type: "price", provider: "binance", symbol: "btc", ts: 2_600, price: 104 }, 2_600);
+  historyStoreService.append({ type: "price", provider: "binance", symbol: "btc", ts: 1_000, price: 100 }, 1_100);
+  historyStoreService.append({ type: "price", provider: "binance", symbol: "btc", ts: 1_200, price: 101 }, 1_200);
+  historyStoreService.append({ type: "price", provider: "binance", symbol: "btc", ts: 1_300, price: 102 }, 1_300);
+  historyStoreService.append({ type: "price", provider: "binance", symbol: "btc", ts: 1_400, price: 103 }, 1_400);
+  historyStoreService.append({ type: "price", provider: "binance", symbol: "btc", ts: 2_600, price: 104 }, 2_600);
 
-  const historyRange = historyService.getRange({
+  const historyRange = historyStoreService.getRange({
     eventType: "price",
     symbol: "btc",
     provider: "binance",
@@ -31,17 +33,17 @@ test("history service prunes by window and size and returns inclusive range", ()
 });
 
 test("history service merges providers sorted by ts then provider", () => {
-  const historyService = InMemoryHistoryService.create({
+  const historyStoreService = HistoryStoreService.create({
     windowMs: 10_000,
     maxSamplesPerStream: 10,
     maxTradesPerStream: 10,
   });
 
-  historyService.append({ type: "price", provider: "kraken", symbol: "btc", ts: 2_000, price: 101 }, 2_000);
-  historyService.append({ type: "price", provider: "binance", symbol: "btc", ts: 2_000, price: 100 }, 2_000);
-  historyService.append({ type: "price", provider: "coinbase", symbol: "btc", ts: 2_100, price: 102 }, 2_100);
+  historyStoreService.append({ type: "price", provider: "kraken", symbol: "btc", ts: 2_000, price: 101 }, 2_000);
+  historyStoreService.append({ type: "price", provider: "binance", symbol: "btc", ts: 2_000, price: 100 }, 2_000);
+  historyStoreService.append({ type: "price", provider: "coinbase", symbol: "btc", ts: 2_100, price: 102 }, 2_100);
 
-  const historyRange = historyService.getRange({
+  const historyRange = historyStoreService.getRange({
     eventType: "price",
     symbol: "btc",
     fromTs: 1_900,
@@ -55,17 +57,51 @@ test("history service merges providers sorted by ts then provider", () => {
 });
 
 test("history service closest price tie picks lower timestamp", () => {
-  const historyService = InMemoryHistoryService.create({
+  const historyStoreService = HistoryStoreService.create({
     windowMs: 10_000,
     maxSamplesPerStream: 10,
     maxTradesPerStream: 10,
   });
 
-  historyService.append({ type: "price", provider: "binance", symbol: "btc", ts: 1_000, price: 99 }, 1_000);
-  historyService.append({ type: "price", provider: "binance", symbol: "btc", ts: 1_200, price: 101 }, 1_200);
+  historyStoreService.append({ type: "price", provider: "binance", symbol: "btc", ts: 1_000, price: 99 }, 1_000);
+  historyStoreService.append({ type: "price", provider: "binance", symbol: "btc", ts: 1_200, price: 101 }, 1_200);
 
-  const closestPoint = historyService.getClosestPrice("btc", 1_100, "binance");
+  const closestPoint = historyStoreService.getClosestPrice("btc", 1_100, "binance");
 
   assert.equal(closestPoint?.ts, 1_000);
   assert.equal(closestPoint?.price, 99);
+});
+
+test("history query rejects invalid query input with actionable errors", () => {
+  const historyStoreService = HistoryStoreService.create({
+    windowMs: 10_000,
+    maxSamplesPerStream: 10,
+    maxTradesPerStream: 10,
+  });
+  const historyQueryService = HistoryQueryService.create(historyStoreService, SymbolService.create());
+
+  assert.throws(
+    (): void => {
+      historyQueryService.getPriceHistory({ symbol: " ", fromTs: 1, toTs: 2 });
+    },
+    (error: unknown): boolean => error instanceof Error && error.message === "symbol is required",
+  );
+  assert.throws(
+    (): void => {
+      historyQueryService.getPriceHistory({ symbol: "btc", fromTs: Number.NaN, toTs: 2 });
+    },
+    (error: unknown): boolean => error instanceof Error && error.message === "fromTs and toTs must be finite numbers",
+  );
+  assert.throws(
+    (): void => {
+      historyQueryService.getPriceHistory({ symbol: "btc", fromTs: 3, toTs: 2 });
+    },
+    (error: unknown): boolean => error instanceof Error && error.message === "fromTs must be less than or equal to toTs",
+  );
+  assert.throws(
+    (): void => {
+      historyQueryService.getPriceClosestTo("btc", Number.NaN);
+    },
+    (error: unknown): boolean => error instanceof Error && error.message === "targetTs must be a finite number",
+  );
 });

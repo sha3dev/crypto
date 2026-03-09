@@ -33,7 +33,7 @@ export class NoProvidersConnectedError extends Error {
    */
 
   public getFailedProviders(): string[] {
-    const providers = [...this.failedProviders];
-    return providers;
+    const providerIds = [...this.failedProviders];
+    return providerIds;
   }
 }

@@ -2,11 +2,12 @@
  * @section imports:internals
  */
 
-import config from "../../config.ts";
-import type { ClockService } from "../../shared/clock.service.ts";
-import type { OrderBookMergerService } from "../../shared/order-book-merger.service.ts";
-import { BaseProviderService, type WebSocketFactory } from "../shared/base-provider.service.ts";
-import type { ProviderBaseOptions, ProviderDataEvent } from "../shared/provider.types.ts";
+import config from "../config.ts";
+import type { OrderBookService } from "../order-book/order-book.service.ts";
+import { ProviderService } from "../provider/provider.service.ts";
+import type { WebSocketFactory } from "../provider/provider.service.ts";
+import type { ProviderBaseOptions, ProviderDataEvent } from "../provider/provider.types.ts";
+import type { ClockService } from "../time/clock.service.ts";
 import type { KrakenEnvelope, KrakenLocalBook } from "./kraken.types.ts";
 
 /**
@@ -25,7 +26,7 @@ type KrakenServiceOptions = {
   clockService: ClockService;
   webSocketFactory: WebSocketFactory;
   providerOptions: ProviderBaseOptions;
-  orderBookMergerService: OrderBookMergerService;
+  orderBookService: OrderBookService;
 };
 
 type ParsedDepthLevel = {
@@ -40,14 +41,16 @@ type AppendKrakenEventsOptions = {
   kind: string;
 };
 
-export class KrakenService extends BaseProviderService {
+const PROVIDER_SERVICE_CLASS = ProviderService;
+
+export class KrakenService extends PROVIDER_SERVICE_CLASS {
   /**
    * @section private:attributes
    */
 
   private readonly symbols: string[];
   private readonly maxLevels: number;
-  private readonly orderBookMergerService: OrderBookMergerService;
+  private readonly orderBookService: OrderBookService;
 
   /**
    * @section private:properties
@@ -68,7 +71,7 @@ export class KrakenService extends BaseProviderService {
     });
     this.symbols = options.symbols;
     this.maxLevels = options.maxLevels;
-    this.orderBookMergerService = options.orderBookMergerService;
+    this.orderBookService = options.orderBookService;
     this.booksBySymbol = new Map<string, KrakenLocalBook>();
   }
 
@@ -113,19 +116,9 @@ export class KrakenService extends BaseProviderService {
   }
 
   private saveSnapshot(symbol: string, rawAsks: unknown[], rawBids: unknown[]): KrakenLocalBook {
-    const asks = this.parseBookLevels(rawAsks).sort((leftLevel, rightLevel) => {
-      const comparison = leftLevel.price - rightLevel.price;
-      return comparison;
-    });
-    const bids = this.parseBookLevels(rawBids).sort((leftLevel, rightLevel) => {
-      const comparison = rightLevel.price - leftLevel.price;
-      return comparison;
-    });
-    const localBook: KrakenLocalBook = {
-      symbol,
-      asks: asks.slice(0, this.maxLevels),
-      bids: bids.slice(0, this.maxLevels),
-    };
+    const asks = this.parseBookLevels(rawAsks).sort((leftLevel, rightLevel) => leftLevel.price - rightLevel.price);
+    const bids = this.parseBookLevels(rawBids).sort((leftLevel, rightLevel) => rightLevel.price - leftLevel.price);
+    const localBook: KrakenLocalBook = { symbol, asks: asks.slice(0, this.maxLevels), bids: bids.slice(0, this.maxLevels) };
     this.booksBySymbol.set(symbol, localBook);
     return localBook;
   }
@@ -134,21 +127,17 @@ export class KrakenService extends BaseProviderService {
     const currentBook = this.booksBySymbol.get(symbol) ?? null;
     let updatedBook: KrakenLocalBook | null = null;
 
-    if (currentBook) {
+    if (currentBook !== null) {
       const deltaAsks = this.parseBookLevels(rawAsks);
       const deltaBids = this.parseBookLevels(rawBids);
-      const mergeResult = this.orderBookMergerService.merge({
+      const mergeResult = this.orderBookService.merge({
         currentAsks: currentBook.asks,
         currentBids: currentBook.bids,
         deltaAsks,
         deltaBids,
         maxLevels: this.maxLevels,
       });
-      updatedBook = {
-        symbol,
-        asks: mergeResult.asks,
-        bids: mergeResult.bids,
-      };
+      updatedBook = { symbol, asks: mergeResult.asks, bids: mergeResult.bids };
       this.booksBySymbol.set(symbol, updatedBook);
     }
 
@@ -166,13 +155,7 @@ export class KrakenService extends BaseProviderService {
         const isValidEvent = symbol.length > 0 && Number.isFinite(ts) && Number.isFinite(price);
 
         if (isValidEvent) {
-          options.parsedEvents.push({
-            type: "price",
-            provider: this.id,
-            symbol,
-            ts,
-            price,
-          });
+          options.parsedEvents.push({ type: "price", provider: this.id, symbol, ts, price });
         }
       }
     }
@@ -190,15 +173,8 @@ export class KrakenService extends BaseProviderService {
         const localBook = options.kind === "snapshot" ? this.saveSnapshot(symbol, rawAsks, rawBids) : this.applyUpdate(symbol, rawAsks, rawBids);
         const isValidEvent = symbol.length > 0 && Number.isFinite(ts) && localBook !== null;
 
-        if (isValidEvent && localBook) {
-          options.parsedEvents.push({
-            type: "orderbook",
-            provider: this.id,
-            symbol,
-            ts,
-            asks: localBook.asks,
-            bids: localBook.bids,
-          });
+        if (isValidEvent && localBook !== null) {
+          options.parsedEvents.push({ type: "orderbook", provider: this.id, symbol, ts, asks: localBook.asks, bids: localBook.bids });
         }
       }
     }
@@ -220,14 +196,8 @@ export class KrakenService extends BaseProviderService {
       exchangeSymbols.push(this.toExchangeSymbol(symbol));
     }
 
-    const tickerSubscription = JSON.stringify({
-      method: "subscribe",
-      params: { channel: "ticker", symbol: exchangeSymbols },
-    });
-    const bookSubscription = JSON.stringify({
-      method: "subscribe",
-      params: { channel: "book", symbol: exchangeSymbols, depth: this.maxLevels },
-    });
+    const tickerSubscription = JSON.stringify({ method: "subscribe", params: { channel: "ticker", symbol: exchangeSymbols } });
+    const bookSubscription = JSON.stringify({ method: "subscribe", params: { channel: "book", symbol: exchangeSymbols, depth: this.maxLevels } });
     const subscriptionMessages = [tickerSubscription, bookSubscription];
     return subscriptionMessages;
   }

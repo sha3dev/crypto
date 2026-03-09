@@ -2,11 +2,12 @@
  * @section imports:internals
  */
 
-import config from "../../config.ts";
-import type { ClockService } from "../../shared/clock.service.ts";
-import type { OrderBookMergerService } from "../../shared/order-book-merger.service.ts";
-import { BaseProviderService, type WebSocketFactory } from "../shared/base-provider.service.ts";
-import type { ProviderBaseOptions, ProviderDataEvent } from "../shared/provider.types.ts";
+import config from "../config.ts";
+import type { OrderBookService } from "../order-book/order-book.service.ts";
+import { ProviderService } from "../provider/provider.service.ts";
+import type { WebSocketFactory } from "../provider/provider.service.ts";
+import type { ProviderBaseOptions, ProviderDataEvent } from "../provider/provider.types.ts";
+import type { ClockService } from "../time/clock.service.ts";
 import type { CoinbaseEnvelope, CoinbaseLocalBook } from "./coinbase.types.ts";
 
 /**
@@ -25,7 +26,7 @@ type CoinbaseServiceOptions = {
   clockService: ClockService;
   webSocketFactory: WebSocketFactory;
   providerOptions: ProviderBaseOptions;
-  orderBookMergerService: OrderBookMergerService;
+  orderBookService: OrderBookService;
 };
 
 type ParsedDepthLevel = {
@@ -40,14 +41,16 @@ type AppendCoinbaseEventsOptions = {
   symbol: string;
 };
 
-export class CoinbaseService extends BaseProviderService {
+const PROVIDER_SERVICE_CLASS = ProviderService;
+
+export class CoinbaseService extends PROVIDER_SERVICE_CLASS {
   /**
    * @section private:attributes
    */
 
   private readonly symbols: string[];
   private readonly maxLevels: number;
-  private readonly orderBookMergerService: OrderBookMergerService;
+  private readonly orderBookService: OrderBookService;
 
   /**
    * @section private:properties
@@ -68,7 +71,7 @@ export class CoinbaseService extends BaseProviderService {
     });
     this.symbols = options.symbols;
     this.maxLevels = options.maxLevels;
-    this.orderBookMergerService = options.orderBookMergerService;
+    this.orderBookService = options.orderBookService;
     this.booksBySymbol = new Map<string, CoinbaseLocalBook>();
   }
 
@@ -120,31 +123,15 @@ export class CoinbaseService extends BaseProviderService {
       const isValidEvent = options.symbol.length > 0 && Number.isFinite(ts) && Number.isFinite(price);
 
       if (isValidEvent) {
-        options.parsedEvents.push({
-          type: "price",
-          provider: this.id,
-          symbol: options.symbol,
-          ts,
-          price,
-        });
+        options.parsedEvents.push({ type: "price", provider: this.id, symbol: options.symbol, ts, price });
       }
     }
   }
 
   private storeSnapshot(symbol: string, rawAsks: [string, string][], rawBids: [string, string][]): CoinbaseLocalBook {
-    const asks = this.parseLevels(rawAsks).sort((leftLevel, rightLevel) => {
-      const comparison = leftLevel.price - rightLevel.price;
-      return comparison;
-    });
-    const bids = this.parseLevels(rawBids).sort((leftLevel, rightLevel) => {
-      const comparison = rightLevel.price - leftLevel.price;
-      return comparison;
-    });
-    const localBook: CoinbaseLocalBook = {
-      symbol,
-      asks: asks.slice(0, this.maxLevels),
-      bids: bids.slice(0, this.maxLevels),
-    };
+    const asks = this.parseLevels(rawAsks).sort((leftLevel, rightLevel) => leftLevel.price - rightLevel.price);
+    const bids = this.parseLevels(rawBids).sort((leftLevel, rightLevel) => rightLevel.price - leftLevel.price);
+    const localBook: CoinbaseLocalBook = { symbol, asks: asks.slice(0, this.maxLevels), bids: bids.slice(0, this.maxLevels) };
     this.booksBySymbol.set(symbol, localBook);
     return localBook;
   }
@@ -153,7 +140,7 @@ export class CoinbaseService extends BaseProviderService {
     const currentBook = this.booksBySymbol.get(symbol) ?? null;
     let updatedBook: CoinbaseLocalBook | null = null;
 
-    if (currentBook) {
+    if (currentBook !== null) {
       const deltaAsks: ParsedDepthLevel[] = [];
       const deltaBids: ParsedDepthLevel[] = [];
 
@@ -171,18 +158,14 @@ export class CoinbaseService extends BaseProviderService {
         }
       }
 
-      const mergeResult = this.orderBookMergerService.merge({
+      const mergeResult = this.orderBookService.merge({
         currentAsks: currentBook.asks,
         currentBids: currentBook.bids,
         deltaAsks,
         deltaBids,
         maxLevels: this.maxLevels,
       });
-      updatedBook = {
-        symbol,
-        asks: mergeResult.asks,
-        bids: mergeResult.bids,
-      };
+      updatedBook = { symbol, asks: mergeResult.asks, bids: mergeResult.bids };
       this.booksBySymbol.set(symbol, updatedBook);
     }
 
@@ -200,14 +183,7 @@ export class CoinbaseService extends BaseProviderService {
       const isValidEvent = options.symbol.length > 0;
 
       if (isValidEvent) {
-        options.parsedEvents.push({
-          type: "orderbook",
-          provider: this.id,
-          symbol: options.symbol,
-          ts,
-          asks: localBook.asks,
-          bids: localBook.bids,
-        });
+        options.parsedEvents.push({ type: "orderbook", provider: this.id, symbol: options.symbol, ts, asks: localBook.asks, bids: localBook.bids });
       }
     }
   }
@@ -221,15 +197,8 @@ export class CoinbaseService extends BaseProviderService {
       const localBook = this.applyChanges(options.symbol, changes);
       const isValidEvent = options.symbol.length > 0 && Number.isFinite(ts) && localBook !== null;
 
-      if (isValidEvent && localBook) {
-        options.parsedEvents.push({
-          type: "orderbook",
-          provider: this.id,
-          symbol: options.symbol,
-          ts,
-          asks: localBook.asks,
-          bids: localBook.bids,
-        });
+      if (isValidEvent && localBook !== null) {
+        options.parsedEvents.push({ type: "orderbook", provider: this.id, symbol: options.symbol, ts, asks: localBook.asks, bids: localBook.bids });
       }
     }
   }
@@ -263,14 +232,8 @@ export class CoinbaseService extends BaseProviderService {
     const parsedEvents: ProviderDataEvent[] = [];
     const coinbaseEnvelope = JSON.parse(messageText) as CoinbaseEnvelope;
     const eventType = coinbaseEnvelope.type ?? "";
-    const productId = coinbaseEnvelope.product_id ?? "";
-    const symbol = this.toSymbol(productId);
-    const appendOptions: AppendCoinbaseEventsOptions = {
-      parsedEvents,
-      coinbaseEnvelope,
-      eventType,
-      symbol,
-    };
+    const symbol = this.toSymbol(coinbaseEnvelope.product_id ?? "");
+    const appendOptions: AppendCoinbaseEventsOptions = { parsedEvents, coinbaseEnvelope, eventType, symbol };
     this.appendTickerEvents(appendOptions);
     this.appendSnapshotEvents(appendOptions);
     this.appendUpdateEvents(appendOptions);

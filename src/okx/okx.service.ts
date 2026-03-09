@@ -2,10 +2,11 @@
  * @section imports:internals
  */
 
-import config from "../../config.ts";
-import type { ClockService } from "../../shared/clock.service.ts";
-import { BaseProviderService, type WebSocketFactory } from "../shared/base-provider.service.ts";
-import type { ProviderBaseOptions, ProviderDataEvent } from "../shared/provider.types.ts";
+import config from "../config.ts";
+import { ProviderService } from "../provider/provider.service.ts";
+import type { WebSocketFactory } from "../provider/provider.service.ts";
+import type { ProviderBaseOptions, ProviderDataEvent } from "../provider/provider.types.ts";
+import type { ClockService } from "../time/clock.service.ts";
 import type { OkxEnvelope } from "./okx.types.ts";
 
 /**
@@ -38,7 +39,9 @@ type AppendOkxEventsOptions = {
   rows: Array<Record<string, unknown>>;
 };
 
-export class OkxService extends BaseProviderService {
+const PROVIDER_SERVICE_CLASS = ProviderService;
+
+export class OkxService extends PROVIDER_SERVICE_CLASS {
   /**
    * @section private:attributes
    */
@@ -111,13 +114,7 @@ export class OkxService extends BaseProviderService {
         const isValidEvent = options.symbol.length > 0 && Number.isFinite(ts) && Number.isFinite(price);
 
         if (isValidEvent) {
-          options.parsedEvents.push({
-            type: "price",
-            provider: this.id,
-            symbol: options.symbol,
-            ts,
-            price,
-          });
+          options.parsedEvents.push({ type: "price", provider: this.id, symbol: options.symbol, ts, price });
         }
       }
     }
@@ -131,14 +128,8 @@ export class OkxService extends BaseProviderService {
         const ts = Number(row.ts);
         const rawAsks = Array.isArray(row.asks) ? row.asks : [];
         const rawBids = Array.isArray(row.bids) ? row.bids : [];
-        const asks = this.parseDepthSide(rawAsks).sort((leftLevel, rightLevel) => {
-          const comparison = leftLevel.price - rightLevel.price;
-          return comparison;
-        });
-        const bids = this.parseDepthSide(rawBids).sort((leftLevel, rightLevel) => {
-          const comparison = rightLevel.price - leftLevel.price;
-          return comparison;
-        });
+        const asks = this.parseDepthSide(rawAsks).sort((leftLevel, rightLevel) => leftLevel.price - rightLevel.price);
+        const bids = this.parseDepthSide(rawBids).sort((leftLevel, rightLevel) => rightLevel.price - leftLevel.price);
         const isValidEvent = options.symbol.length > 0 && Number.isFinite(ts);
 
         if (isValidEvent) {

@@ -2,10 +2,11 @@
  * @section imports:internals
  */
 
-import config from "../../config.ts";
-import type { ClockService } from "../../shared/clock.service.ts";
-import { BaseProviderService, type WebSocketFactory } from "../shared/base-provider.service.ts";
-import type { ProviderBaseOptions, ProviderDataEvent } from "../shared/provider.types.ts";
+import config from "../config.ts";
+import { ProviderService } from "../provider/provider.service.ts";
+import type { WebSocketFactory } from "../provider/provider.service.ts";
+import type { ProviderBaseOptions, ProviderDataEvent } from "../provider/provider.types.ts";
+import type { ClockService } from "../time/clock.service.ts";
 import type { BinanceAggTradeEnvelope, BinanceDepthEnvelope, BinanceStreamEnvelope } from "./binance.types.ts";
 
 /**
@@ -36,7 +37,9 @@ type AppendBinanceEventsOptions = {
   parsedEvents: ProviderDataEvent[];
 };
 
-export class BinanceService extends BaseProviderService {
+const PROVIDER_SERVICE_CLASS = ProviderService;
+
+export class BinanceService extends PROVIDER_SERVICE_CLASS {
   /**
    * @section private:attributes
    */
@@ -111,15 +114,7 @@ export class BinanceService extends BaseProviderService {
 
       if (isValidEvent) {
         options.parsedEvents.push({ type: "price", provider: this.id, symbol, ts, price });
-        options.parsedEvents.push({
-          type: "trade",
-          provider: this.id,
-          symbol,
-          ts,
-          price,
-          size,
-          buyerIsMaker,
-        });
+        options.parsedEvents.push({ type: "trade", provider: this.id, symbol, ts, price, size, buyerIsMaker });
       }
     }
   }
@@ -133,25 +128,12 @@ export class BinanceService extends BaseProviderService {
       const rawBids = depthEnvelope.bids ?? depthEnvelope.b ?? [];
       const symbol = this.toSymbol(options.streamName);
       const ts = Number(depthEnvelope.E ?? Date.now());
-      const asks = this.parseDepthLevels(rawAsks).sort((leftLevel, rightLevel) => {
-        const comparison = leftLevel.price - rightLevel.price;
-        return comparison;
-      });
-      const bids = this.parseDepthLevels(rawBids).sort((leftLevel, rightLevel) => {
-        const comparison = rightLevel.price - leftLevel.price;
-        return comparison;
-      });
+      const asks = this.parseDepthLevels(rawAsks).sort((leftLevel, rightLevel) => leftLevel.price - rightLevel.price);
+      const bids = this.parseDepthLevels(rawBids).sort((leftLevel, rightLevel) => rightLevel.price - leftLevel.price);
       const isValidEvent = symbol.length > 0 && Number.isFinite(ts);
 
       if (isValidEvent) {
-        options.parsedEvents.push({
-          type: "orderbook",
-          provider: this.id,
-          symbol,
-          ts,
-          asks,
-          bids,
-        });
+        options.parsedEvents.push({ type: "orderbook", provider: this.id, symbol, ts, asks, bids });
       }
     }
   }
@@ -182,11 +164,7 @@ export class BinanceService extends BaseProviderService {
     const parsedEvents: ProviderDataEvent[] = [];
     const streamEnvelope = JSON.parse(messageText) as BinanceStreamEnvelope;
     const streamName = streamEnvelope.stream ?? "";
-    const appendOptions: AppendBinanceEventsOptions = {
-      streamName,
-      envelopePayload: streamEnvelope.data,
-      parsedEvents,
-    };
+    const appendOptions: AppendBinanceEventsOptions = { streamName, envelopePayload: streamEnvelope.data, parsedEvents };
     this.appendAggTradeEvents(appendOptions);
     this.appendDepthEvents(appendOptions);
     return parsedEvents;

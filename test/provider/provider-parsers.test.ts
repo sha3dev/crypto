@@ -186,3 +186,19 @@ test("chainlink parser ignores PONG heartbeat frames", async () => {
   const hasErrorStatus = capturedEvents.some((event) => event.type === "status" && event.status === "error");
   assert.equal(hasErrorStatus, false);
 });
+
+test("chainlink parser ignores empty websocket frames", async () => {
+  const capturedEvents: FeedEvent[] = [];
+  const chainlinkService = ChainlinkService.create({
+    symbols: ["btc"],
+    clockService: ClockService.createSystemClock(),
+    webSocketFactory: CREATE_NOOP_WEB_SOCKET_FACTORY(),
+    providerOptions: CREATE_PROVIDER_OPTIONS(),
+  });
+
+  await ARM_LISTENER(chainlinkService, COLLECT_EVENTS(capturedEvents)).catch(() => undefined);
+  chainlinkService.handleRawMessage("");
+
+  const hasErrorStatus = capturedEvents.some((event) => event.type === "status" && event.status === "error");
+  assert.equal(hasErrorStatus, false);
+});

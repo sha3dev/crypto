@@ -99,6 +99,15 @@ export class ChainlinkService extends PROVIDER_SERVICE_CLASS {
     return shouldInclude;
   }
 
+  private shouldIgnoreControlMessage(messageText: string): boolean {
+    const normalizedMessage = messageText.trim().toUpperCase();
+    const isEmptyMessage = normalizedMessage.length === 0;
+    const isPongMessage = normalizedMessage === CHAINLINK_PONG_MESSAGE;
+    const isPingMessage = normalizedMessage === CHAINLINK_PING_MESSAGE;
+    const shouldIgnore = isEmptyMessage || isPongMessage || isPingMessage;
+    return shouldIgnore;
+  }
+
   private parseEnvelope(chainlinkEnvelope: ChainlinkEnvelope): ProviderDataEvent[] {
     const parsedEvents: ProviderDataEvent[] = [];
     const topic = chainlinkEnvelope.topic ?? "";
@@ -154,10 +163,9 @@ export class ChainlinkService extends PROVIDER_SERVICE_CLASS {
 
   protected parseMessage(messageText: string): ProviderDataEvent[] {
     const parsedEvents: ProviderDataEvent[] = [];
-    const normalizedMessage = messageText.trim().toUpperCase();
-    const isPongMessage = normalizedMessage === CHAINLINK_PONG_MESSAGE;
+    const shouldIgnoreMessage = this.shouldIgnoreControlMessage(messageText);
 
-    if (!isPongMessage) {
+    if (!shouldIgnoreMessage) {
       const decodedEnvelope = JSON.parse(messageText) as ChainlinkEnvelope | ChainlinkEnvelope[];
       const envelopes = Array.isArray(decodedEnvelope) ? decodedEnvelope : [decodedEnvelope];
 
